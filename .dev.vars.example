@@ -1,0 +1,30 @@
+# ============================================
+# Djuniors - Local development secrets template
+# ============================================
+#
+# This file is a TEMPLATE only — commit it to git so new devs know what to set
+# up, but use `.dev.vars` (gitignored) for actual local values. The wrangler
+# CLI reads `.dev.vars` automatically when running `wrangler dev`.
+#
+# Copy this file:
+#   cp .dev.vars.example .dev.vars
+# then fill in the real values below.
+#
+# Secrets for production deploys are NOT set here — use:
+#   wrangler secret put <NAME>
+# per the DEPLOY.md guide.
+
+# Fonnte.io — WhatsApp notifications
+# Sign up at https://fonnte.com, get a token from the dashboard, paste below.
+WA_FONNTE_TOKEN=your_fonnte_token_here
+
+# JWT signing key — used to sign admin + user auth tokens.
+# Keep it long and random. Any string ≥ 32 chars is fine for local dev.
+# Generate a new one with:
+#   openssl rand -base64 48
+JWT_SECRET=djuniors-local-dev-secret-change-me
+
+# Cloudflare Turnstile — anti-bot widget on registration form
+# Sign up at https://dash.cloudflare.com/?to=/:account/turnstile
+TURNSTILE_SECRET=1x00000000000000000000AA_aaaa  # Test keys from CF docs — replace with real ones
+TURNSTILE_SITE_KEY=1x00000000000000000000AA  # Test keys from CF docs — replace with real ones

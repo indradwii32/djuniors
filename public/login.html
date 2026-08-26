@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Djuniors Learning Center</title>
+    <link rel="icon" id="site-favicon" href="images/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-32.png" sizes="32x32" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-32.png" sizes="32x32" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-192.png" sizes="192x192" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-192.png" sizes="192x192" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <meta name="theme-color" content="#0EA5E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#EC4899" media="(prefers-color-scheme: dark)">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/baloo2-latin.woff2">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/nunito-latin.woff2">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/login.css?v=20260821">
+</head>
+<body>
+    <main class="login-page">
+        <div class="login-card">
+            <div class="login-header">
+                <span class="login-logo">🧮</span>
+                <h1>Masuk ke Djuniors Learning Center</h1>
+                <p>Selamat datang kembali! 👋</p>
+            </div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        required
+                        placeholder="email@contoh.com"
+                        autoComplete="email"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-input">
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            required
+                            placeholder="Masukkan password"
+                            autoComplete="current-password"
+                        >
+                        <button type="button" class="toggle-password" id="toggle-password">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-error hidden" id="login-error"></div>
+
+                <button type="submit" class="login-btn" id="login-btn">
+                    🚀 Masuk
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>Belum punya akun? <a href="daftar.html">Daftar kelas</a></p>
+                <p style="margin-top: 0.4rem;"><a href="lacak.html" style="color: var(--primary-blue); font-weight: 700;">🔍 Lacak Status Pendaftaran</a></p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/login.js?v=20260821"></script>
+</body>
+</html>

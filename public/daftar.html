@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendaftaran Kelas Live — Djuniors Learning Center 🧮</title>
+    <link rel="icon" id="site-favicon" href="images/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-32.png" sizes="32x32" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-32.png" sizes="32x32" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-192.png" sizes="192x192" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-192.png" sizes="192x192" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <meta name="theme-color" content="#0EA5E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#EC4899" media="(prefers-color-scheme: dark)">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/baloo2-latin.woff2">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/nunito-latin.woff2">
+    <link rel="stylesheet" href="css/style.css?v=20260821">
+    <link rel="stylesheet" href="css/form.css?v=20260821">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="#" class="logo">
+                            <picture>
+                                <source srcset="images/djuniors-logo-wordmark.webp" type="image/webp">
+                                <img class="site-logo" width="140" height="44" decoding="async" src="images/djuniors-logo-wordmark.png" alt="Djuniors Learning Center">
+                            </picture>
+                        </a>
+            <button class="nav-toggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-menu">
+                <li><a href="index.html">Beranda</a></li>
+                <li><a href="index.html#features">Fitur</a></li>
+                <li><a href="index.html#classes">Pilihan Kelas</a></li>
+                <li><a href="lacak.html">Lacak Pendaftaran</a></li>
+                <li><a href="login.html" class="btn-nav">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="form-page">
+        <div class="container">
+            <div class="form-card">
+                <h1>📝 Pendaftaran Kelas — Djuniors Learning Center</h1>
+                <p>Belajar matematika interaktif live bersama guru via Google Meet!</p>
+
+                <!-- Google Meet Banner -->
+                <div class="meet-banner">
+                    <div class="meet-icon">📹</div>
+                    <div class="meet-info">
+                        <strong>Kelas Live Interaktif via Google Meet</strong>
+                        <span>Maksimal 8 siswa per kelas agar setiap anak mendapat perhatian penuh!</span>
+                    </div>
+                </div>
+
+                <!-- Stepper Indicator -->
+                <div class="stepper-container">
+                    <div class="stepper-steps">
+                        <div class="step-item active" data-step="1">
+                            <div class="step-number">1</div>
+                            <span class="step-title">Pilih Kelas</span>
+                        </div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-number">2</div>
+                            <span class="step-title">Orang Tua</span>
+                        </div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-number">3</div>
+                            <span class="step-title">Data Anak</span>
+                        </div>
+                        <div class="step-item" data-step="4">
+                            <div class="step-number">4</div>
+                            <span class="step-title">Pembayaran</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="registration-form" novalidate>
+                    <!-- STEP 1: Pilih Kelas & Jam Belajar -->
+                    <div class="form-step active" data-step="1">
+                        <h2>1. Pilih Program Kelas 🧮</h2>
+                        <p class="step-subtitle">Pilih program belajar yang sesuai untuk tingkat kemampuan anak Anda</p>
+                        
+                        <div class="class-options" id="class-options">
+                            <p class="form-info" style="grid-column: 1/-1;">Memuat pilihan kelas...</p>
+                        </div>
+
+                        <h2>2. Pilih Jam & Jadwal Belajar ⏰</h2>
+                        <p class="step-subtitle">Pilih slot jadwal yang cocok dengan waktu luang anak</p>
+                        
+                        <div class="schedule-options" id="schedule-options">
+                            <p class="form-info" style="grid-column: 1/-1;">Pilih kelas terlebih dahulu untuk melihat jadwal.</p>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Data Orang Tua -->
+                    <div class="form-step" data-step="2">
+                        <h2>Data Orang Tua / Wali 👨‍👩‍👧</h2>
+                        <p class="step-subtitle">Informasi ini digunakan untuk konfirmasi pendaftaran & link kelas</p>
+
+                        <div class="form-group">
+                            <label for="parent-name">Nama Lengkap Orang Tua / Wali <span class="required-mark">*</span></label>
+                            <input type="text" id="parent-name" name="parent_name" required placeholder="Contoh: Budi Santoso">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="parent-phone">Nomor WhatsApp <span class="required-mark">*</span></label>
+                            <input type="tel" id="parent-phone" name="parent_phone" required placeholder="08xxxxxxxxxx atau 628xxxxxxxxxx">
+                            <small class="form-hint">Nomor ini digunakan untuk login, melacak status, dan menerima link Google Meet</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="parent-email">Email <span class="optional-badge">(opsional)</span></label>
+                            <input type="email" id="parent-email" name="parent_email" placeholder="email@contoh.com">
+                            <small class="form-hint">Untuk pengiriman invoice & bukti pendaftaran resmi</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="parent-city">Kota Asal / Domisili <span class="required-mark">*</span></label>
+                            <input type="text" id="parent-city" name="parent_city" required placeholder="Contoh: Jakarta Selatan, Surabaya, Medan, dll">
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Data Anak -->
+                    <div class="form-step" data-step="3">
+                        <h2>Data Anak / Siswa 🧒</h2>
+                        <p class="step-subtitle">Masukkan data anak yang akan mengikuti kelas matematika</p>
+
+                        <div class="child-count-notice" id="child-pricing-notice">
+                            💡 <strong>Info:</strong> Anda dapat mendaftarkan lebih dari 1 anak untuk kelas ini. Biaya otomatis dihitung berdasarkan jumlah anak yang didaftarkan.
+                        </div>
+
+                        <div class="children-container" id="children-container">
+                            <!-- Dynamic Child Item (first one required) -->
+                            <div class="child-item" data-child-index="0">
+                                <div class="child-item-header">
+                                    <span class="child-item-title">Anak ke-1</span>
+                                </div>
+                                <div class="child-inputs-grid">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Nama Lengkap Anak <span class="required-mark">*</span></label>
+                                        <input type="text" class="child-name-input" name="child_name_0" required placeholder="Contoh: Kevin Pratama">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Umur / Tingkat Kelas <span class="required-mark">*</span></label>
+                                        <input type="text" class="child-age-input" name="child_age_0" required placeholder="Contoh: TK B (5 thn) / Kelas 2 SD">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn-add-child" id="btn-add-child">
+                            <span>➕</span> Tambah Anak Lainnya (Ikut Kelas Ini)
+                        </button>
+                    </div>
+
+                    <!-- STEP 4: Ringkasan & Pembayaran -->
+                    <div class="form-step" data-step="4">
+                        <h2>Ringkasan & Metode Pembayaran 💳</h2>
+                        <p class="step-subtitle">Periksa kembali data pendaftaran Anda sebelum menyelesaikan pemesanan</p>
+
+                        <div class="summary-container">
+                            <!-- Review Card -->
+                            <div class="summary-card">
+                                <div class="summary-card-title">📋 Ringkasan Pendaftaran</div>
+                                <div class="summary-details-grid">
+                                    <div>
+                                        <div class="summary-item-label">Program Kelas</div>
+                                        <div class="summary-item-val" id="summary-class-name">-</div>
+                                    </div>
+                                    <div>
+                                        <div class="summary-item-label">Jadwal Belajar</div>
+                                        <div class="summary-item-val" id="summary-schedule-slot">-</div>
+                                    </div>
+                                    <div>
+                                        <div class="summary-item-label">Orang Tua / Wali</div>
+                                        <div class="summary-item-val" id="summary-parent-info">-</div>
+                                    </div>
+                                    <div>
+                                        <div class="summary-item-label">Kota Asal</div>
+                                        <div class="summary-item-val" id="summary-parent-city">-</div>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 0.85rem;">
+                                    <div class="summary-item-label">Daftar Anak Peserta</div>
+                                    <div class="summary-children-list" id="summary-children-list"></div>
+                                </div>
+                            </div>
+
+                            <!-- Cost Breakdown -->
+                            <div class="price-breakdown-card">
+                                <div class="summary-card-title">💰 Rincian Biaya</div>
+                                <div class="price-row">
+                                    <span>Biaya per Siswa</span>
+                                    <span id="price-per-child">Rp 0</span>
+                                </div>
+                                <div class="price-row">
+                                    <span>Jumlah Anak</span>
+                                    <span id="price-children-count">1 Siswa</span>
+                                </div>
+                                <div class="price-row">
+                                    <span>Subtotal</span>
+                                    <span id="price-subtotal">Rp 0</span>
+                                </div>
+
+                                <!-- Promo Box -->
+                                <div class="promo-box">
+                                    <div class="promo-input-group">
+                                        <input type="text" id="promo-code-input" placeholder="Masukkan Kode Promo (opsional)">
+                                        <button type="button" class="btn-promo" id="btn-apply-promo">Terapkan</button>
+                                    </div>
+                                    <div id="promo-message" class="hidden"></div>
+                                </div>
+
+                                <div class="price-row discount-row hidden" id="discount-row">
+                                    <span id="discount-label">Diskon Promo</span>
+                                    <span id="discount-val">- Rp 0</span>
+                                </div>
+
+                                <div class="price-row total-row">
+                                    <span>Total Pembayaran</span>
+                                    <span class="total-amount-display" id="price-final-total">Rp 0</span>
+                                </div>
+                            </div>
+
+                            <!-- Payment Method Selector -->
+                            <div>
+                                <div class="summary-card-title">Metode Pembayaran</div>
+                                <div class="payment-methods-grid">
+                                    <div class="payment-method-card active" data-method="bank_transfer">
+                                        <div class="payment-method-icon">🏦</div>
+                                        <div class="payment-method-name">Transfer Bank</div>
+                                    </div>
+                                    <div class="payment-method-card" data-method="qris">
+                                        <div class="payment-method-icon">📱</div>
+                                        <div class="payment-method-name">QRIS</div>
+                                    </div>
+                                    <div class="payment-method-card" data-method="ewallet">
+                                        <div class="payment-method-icon">💳</div>
+                                        <div class="payment-method-name">E-Wallet</div>
+                                    </div>
+                                </div>
+
+                                <!-- Bank Details Box -->
+                                <div class="payment-details-box" id="bank-transfer-details">
+                                    <div style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.75rem;">
+                                        Silakan transfer ke salah satu rekening resmi PT Djuniors:
+                                    </div>
+                                    <div class="bank-account-card">
+                                        <div>
+                                            <div class="bank-info-name">Bank BCA</div>
+                                            <div class="bank-info-number">1234567890</div>
+                                            <div class="bank-info-holder">a.n. PT Djuniors Indonesia</div>
+                                        </div>
+                                        <button type="button" class="btn-copy" data-copy="1234567890">Salin Rekening</button>
+                                    </div>
+                                    <div class="bank-account-card">
+                                        <div>
+                                            <div class="bank-info-name">Bank Mandiri</div>
+                                            <div class="bank-info-number">123456789012345</div>
+                                            <div class="bank-info-holder">a.n. PT Djuniors Indonesia</div>
+                                        </div>
+                                        <button type="button" class="btn-copy" data-copy="123456789012345">Salin Rekening</button>
+                                    </div>
+                                </div>
+
+                                <div class="payment-details-box hidden" id="qris-details">
+                                    <div style="font-size: 0.85rem; color: #475569; text-align: center;">
+                                        QRIS instan dapat di-scan via GoPay, OVO, Dana, ShopeePay, BCA Mobile, Livin, dll. Kode QRIS dan tombol unggah bukti bayar akan tersedia setelah pendaftaran dibuat.
+                                    </div>
+                                </div>
+
+                                <div class="payment-details-box hidden" id="ewallet-details">
+                                    <div style="font-size: 0.85rem; color: #475569; text-align: center;">
+                                        Mendukung transfer saldo GoPay, OVO, Dana ke nomor official: <strong>0812-3456-7890</strong> (a.n. PT Djuniors Indonesia).
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Optional Notes -->
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="reg-notes">Catatan Tambahan <span class="optional-badge">(opsional)</span></label>
+                                <textarea id="reg-notes" name="notes" rows="2" placeholder="Tuliskan catatan khusus atau permintaan terkait anak (opsional)"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <div class="form-navigation">
+                        <button type="button" id="prev-btn" disabled>
+                            ← Sebelumnya
+                        </button>
+                        <button type="button" id="next-btn">
+                            Selanjutnya →
+                        </button>
+                        <button type="submit" class="btn-submit hidden" id="submit-btn">
+                            🎉 Kirim Pendaftaran Sekarang
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay hidden" id="success-modal">
+        <div class="modal-content">
+            <div class="success-icon">🎉</div>
+            <h2>Pendaftaran Berhasil!</h2>
+            <p class="success-sub">Data pendaftaran Anda telah berhasil dicatat ke sistem Djuniors Learning Center. Tim kami akan menghubungi Anda untuk konfirmasi pembayaran.</p>
+
+            <div class="reg-number-card">
+                <div class="reg-number-label">Nomor Registrasi Anda:</div>
+                <div class="reg-number-val" id="modal-reg-number">DJN-2026-XXXX</div>
+                <button type="button" class="btn-copy-reg" id="btn-copy-reg-modal">📋 Salin Nomor Registrasi</button>
+            </div>
+
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 12px; margin-bottom: 1.25rem; font-size: 0.9rem; text-align: left;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                    <span style="color: #64748b;">Total Pembayaran:</span>
+                    <strong style="color: var(--happy-orange);" id="modal-total-amount">Rp 0</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                    <span style="color: #64748b;">Metode Bayar:</span>
+                    <strong id="modal-payment-method">Transfer Bank</strong>
+                </div>
+                <p style="margin: 0.5rem 0 0; font-size: 0.8rem; color: #64748b;">
+                    Silakan simpan nomor registrasi di atas untuk melacak status pembayaran dan mengakses link Google Meet kelas live.
+                </p>
+            </div>
+
+            <div class="success-actions">
+                <a href="lacak.html" class="btn-track-action" id="btn-modal-track">
+                    🔍 Lacak Status & Unggah Bukti Bayar
+                </a>
+                <a href="#" target="_blank" class="btn-wa-action" id="btn-modal-wa">
+                    💬 Konfirmasi via WhatsApp
+                </a>
+                <a href="index.html" class="btn-home-action">
+                    Kembali ke Beranda
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/registration.js?v=20260821"></script>
+</body>
+</html>

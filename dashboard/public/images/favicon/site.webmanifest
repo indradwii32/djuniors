@@ -1,0 +1,35 @@
+{
+  "name": "Djuniors Learning Center",
+  "short_name": "Djuniors",
+  "description": "Kelas matematika live interaktif untuk anak TK & SD via Google Meet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0EA5E9",
+  "theme_color": "#0EA5E9",
+  "icons": [
+    {
+      "src": "/images/favicon/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/favicon/favicon-dark-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/images/favicon/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/favicon/favicon-dark-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

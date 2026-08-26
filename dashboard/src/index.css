@@ -1,0 +1,533 @@
+/* ============================================
+   Djuniors Dashboard - Global & Responsive Styles
+   ============================================ */
+
+/* Self-hosted fonts (Task G). Same woff2 files referenced via Vite's
+   /public copy: dashboard/public/fonts/*.woff2 becomes /fonts/*.woff2.
+   font-display: swap so initial paint never blocks on font load. */
+
+@font-face {
+    font-family: 'Baloo 2';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('/fonts/baloo2-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Baloo 2';
+    font-style: normal;
+    font-weight: 400 800;
+    font-display: swap;
+    src: url('/fonts/baloo2-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/nunito-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/nunito-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --primary-blue: #4A90D9;
+  --sunshine-yellow: #FFD93D;
+  --happy-orange: #FF6B35;
+  --fresh-green: #6BCB77;
+  --soft-pink: #FF9CEE;
+  --light-bg: #FFF8E7;
+  --dark-text: #1E293B;
+  --sidebar-bg: #1E293B;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #F8FAFC;
+  color: var(--dark-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 700;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Sidebar Responsive Layout */
+@media (min-width: 1024px) {
+  .sidebar-container {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    z-index: 50;
+    transform: translateX(0) !important;
+  }
+  
+  .main-content-wrapper {
+    margin-left: 260px !important;
+  }
+  
+  .lg-hidden {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .sidebar-container { position: fixed; inset: 0 auto 0 0; z-index: 50; transform: translateX(-100%); transition: transform 0.3s ease; width: 260px; }
+  .sidebar-container.sidebar-open { transform: translateX(0); }
+  
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+    cursor: pointer;
+  }
+  
+  .main-content-wrapper {
+    margin-left: 0 !important;
+  }
+}
+
+/* Sidebar Submenu Collapsible Animations */
+.sidebar-submenu {
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+}
+
+.sidebar-submenu.open {
+  max-height: 400px;
+  opacity: 1;
+}
+
+.sidebar-submenu.closed {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* Table Responsive - Horizontal Scroll with smooth touch */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Stats Grid Responsive */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* Modal Responsive System */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.modal-content {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .modal-responsive {
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 94vh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .modal-fullscreen-mobile {
+    border-radius: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+/* Responsive Filter & Search Toolbar */
+.filter-bar-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.search-bar-responsive {
+  width: 100%;
+  max-width: 360px;
+}
+
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  
+  .dashboard-main-content {
+    padding: 1rem !important;
+  }
+
+  .search-bar-responsive {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .filter-controls-responsive {
+    width: 100% !important;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .filter-controls-responsive > * {
+    flex: 1;
+    min-width: 130px;
+  }
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Navigation Links */
+.nav-link-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF !important;
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-5px);
+  }
+  40%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+/* ============================================
+   Icon & Emoji Picker Styles
+   ============================================ */
+.icon-picker-root {
+  position: relative;
+}
+
+.icon-picker-trigger-btn:hover:not(:disabled) {
+  border-color: #4A90D9 !important;
+  background-color: #FAFCFF !important;
+}
+
+.icon-picker-popover {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.icon-picker-category-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.icon-picker-item {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  font-size: 20px;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.icon-picker-item:hover {
+  background-color: #F1F5F9 !important;
+  transform: scale(1.08);
+}
+
+.icon-picker-item.selected {
+  border: 2px solid #3B82F6 !important;
+  background-color: #EFF6FF !important;
+}
+
+.icon-picker-emoji-size {
+  font-size: 32px !important;
+  line-height: 1;
+}
+
+.icon-picker-svg-size {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* ============================================
+   SVG Icons Override & Fix (Prevent Black Boxes)
+   Note: stroke color di-set inline per-icon (vibrant colors),
+   CSS hanya memastikan fill none & transparent background
+   ============================================ */
+.icon-picker-item svg,
+.icon-picker-item span svg,
+.icon-picker-trigger-btn svg,
+.cms-icon-box svg,
+.cms-icon-box span svg,
+.svg-icon-wrapper svg {
+  fill: none !important;
+  stroke-width: 2 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+/* ============================================
+   CMS Tabs Bar & Layout Responsiveness
+   ============================================ */
+.cms-tabs-bar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.cms-tabs-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.cms-tabs-bar::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 2px;
+}
+
+@media (max-width: 1024px) {
+  .cms-main-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.cms-main-layout > div {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* ============================================
+   Responsive Form Grid Utilities
+   ============================================ */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-grid-1-140 {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 0.75rem;
+}
+
+.form-grid-2-1 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .cms-header-box,
+  .cms-form-card,
+  .cms-preview-card {
+    padding: 1rem !important;
+  }
+
+  .form-grid-2,
+  .form-grid-1-140,
+  .form-grid-2-1,
+  .form-grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+
+  .schedule-slot-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .schedule-slot-row > select:first-child {
+    grid-column: span 2;
+  }
+
+  .cms-nav-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cms-feature-row {
+    grid-template-columns: 1fr auto !important;
+  }
+
+  .cms-testimonial-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cms-social-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .notif-tab-btn {
+    padding: 0.5rem 0.85rem !important;
+    font-size: 0.9rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .icon-picker-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .icon-picker-popover {
+    width: min(290px, 92vw) !important;
+  }
+}
+
+/* Touch-friendly compact buttons (tables, chips) — min 38px tappable */
+.btn-touch { min-height: 38px; }
+.btn-touch-sm { min-height: 34px; }
+@media (max-width: 768px) {
+  .btn-touch { min-height: 40px; }
+  .btn-touch-sm { min-height: 38px; }
+}
+

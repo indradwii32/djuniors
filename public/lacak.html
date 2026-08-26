@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lacak Status Pendaftaran — Djuniors Learning Center 🧮</title>
+    <link rel="icon" id="site-favicon" href="images/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-32.png" sizes="32x32" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-32.png" sizes="32x32" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-192.png" sizes="192x192" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" href="images/favicon/favicon-dark-192.png" sizes="192x192" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="images/favicon/apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="images/favicon/site.webmanifest">
+    <meta name="theme-color" content="#0EA5E9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#EC4899" media="(prefers-color-scheme: dark)">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/baloo2-latin.woff2">
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/nunito-latin.woff2">
+    <link rel="stylesheet" href="css/style.css?v=20260821">
+    <link rel="stylesheet" href="css/form.css?v=20260821">
+    <link rel="stylesheet" href="css/tracking.css?v=20260821">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <picture>
+                    <source srcset="images/djuniors-logo-wordmark.webp" type="image/webp">
+                    <img class="site-logo" width="140" height="44" decoding="async" src="images/djuniors-logo-wordmark.png" alt="Djuniors Learning Center">
+                </picture>
+            </a>
+            <button class="nav-toggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+            <ul class="nav-menu">
+                <li><a href="index.html">Beranda</a></li>
+                <li><a href="index.html#features">Fitur</a></li>
+                <li><a href="index.html#classes">Pilihan Kelas</a></li>
+                <li><a href="lacak.html" style="color: var(--primary-blue); font-weight: 800;">Lacak Pendaftaran</a></li>
+                <li><a href="daftar.html" class="btn-nav">Daftar Sekarang</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="tracking-page">
+        <div class="container">
+            <!-- Hero Title -->
+            <div class="tracking-hero">
+                <h1>🔍 Lacak Status & Pembayaran</h1>
+                <p>Cek status registrasi anak, konfirmasi pembayaran, atau unggah bukti transfer kelas live matematika.</p>
+            </div>
+
+            <!-- Search Card -->
+            <div class="tracking-search-card">
+                <form id="tracking-search-form">
+                    <div class="search-input-group">
+                        <input
+                            type="text"
+                            id="search-query-input"
+                            placeholder="Masukkan No. Registrasi (DJN-...) atau No. WhatsApp (08...)"
+                            required
+                            autocomplete="off"
+                        >
+                        <button type="submit" class="btn-search" id="btn-search-submit">
+                            <span>🔎</span> Lacak
+                        </button>
+                    </div>
+                    <div class="search-hints">
+                        <span>💡 Contoh:</span>
+                        <span class="hint-badge" style="cursor: pointer;" onclick="document.getElementById('search-query-input').value='DJN-2026'; document.getElementById('search-query-input').focus();">DJN-2026...</span>
+                        <span>atau</span>
+                        <span class="hint-badge" style="cursor: pointer;" onclick="document.getElementById('search-query-input').value='08123456789'; document.getElementById('search-query-input').focus();">08123456789</span>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Result Dynamic Area -->
+            <div id="tracking-container">
+                <!-- Default Placeholder View -->
+                <div class="tracking-placeholder-card" id="view-placeholder">
+                    <div class="placeholder-icon">📋</div>
+                    <h3>Cari Data Pendaftaran Anda</h3>
+                    <p>Masukkan Nomor Registrasi yang Anda terima saat mendaftar atau Nomor WhatsApp orang tua untuk melihat status pendaftaran dan jadwal belajar.</p>
+                </div>
+
+                <!-- Loading State View -->
+                <div class="tracking-placeholder-card hidden" id="view-loading">
+                    <div class="spinner"></div>
+                    <h3>Sedang Mencari Data...</h3>
+                    <p>Mohon tunggu sebentar, kami sedang mengambil data pendaftaran Anda dari server.</p>
+                </div>
+
+                <!-- Error / Not Found View -->
+                <div class="tracking-placeholder-card hidden" id="view-error">
+                    <div class="placeholder-icon">😕</div>
+                    <h3 id="error-title">Data Tidak Ditemukan</h3>
+                    <p id="error-message">Nomor registrasi atau WhatsApp tidak ditemukan di sistem kami. Pastikan nomor yang dimasukkan sudah benar.</p>
+                    <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <a href="daftar.html" class="btn-primary" style="padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 12px; font-weight: 700;">
+                            📝 Daftar Baru
+                        </a>
+                        <a href="https://wa.me/6281234567890" target="_blank" class="btn-wa-contact">
+                            💬 Bantuan WhatsApp
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Single Registration Detail View -->
+                <div class="tracking-result-card hidden" id="view-single-result">
+                    <!-- Populated dynamically via JS -->
+                </div>
+
+                <!-- Multiple Registrations List View (via Phone search) -->
+                <div class="hidden" id="view-multi-result">
+                    <h3 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--dark-text);" id="multi-result-title">
+                        Daftar Pendaftaran Ditemukan:
+                    </h3>
+                    <div class="multi-results-list" id="multi-results-container">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/tracking.js?v=20260821"></script>
+</body>
+</html>

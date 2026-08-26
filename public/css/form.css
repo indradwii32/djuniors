@@ -1,0 +1,1008 @@
+/* ============================================
+   Djuniors - Registration Form Styles
+   ============================================ */
+
+.form-page {
+    min-height: 100vh;
+    padding: 100px 1.5rem 4rem;
+    background: linear-gradient(135deg, #FFF8E7 0%, #E8F4FD 100%);
+}
+
+.form-card {
+    max-width: 760px;
+    margin: 0 auto;
+    background: white;
+    padding: 2.5rem;
+    border-radius: 25px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    position: relative;
+}
+
+.form-card > h1 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 0.4rem;
+    color: var(--dark-text);
+}
+
+.form-card > p {
+    text-align: center;
+    color: #636e72;
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+}
+
+/* Google Meet Banner */
+.meet-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    border: 2px solid var(--fresh-green);
+}
+
+.meet-icon {
+    font-size: 2.2rem;
+}
+
+.meet-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.meet-info strong {
+    color: var(--dark-text);
+    font-size: 0.95rem;
+}
+
+.meet-info span {
+    color: #4b6584;
+    font-size: 0.85rem;
+}
+
+/* Stepper Bar */
+.stepper-container {
+    margin-bottom: 2rem;
+}
+
+.stepper-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    position: relative;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+
+.step-number {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #edf2f7;
+    color: #718096;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+    z-index: 2;
+}
+
+.step-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #718096;
+    margin-top: 0.4rem;
+    transition: color 0.3s;
+}
+
+.step-item.active .step-number {
+    background: var(--primary-blue);
+    color: white;
+    box-shadow: 0 4px 14px rgba(74, 144, 217, 0.4);
+    transform: scale(1.08);
+}
+
+.step-item.active .step-title {
+    color: var(--primary-blue);
+}
+
+.step-item.completed .step-number {
+    background: var(--fresh-green);
+    color: white;
+}
+
+.step-item.completed .step-title {
+    color: var(--fresh-green);
+}
+
+/* Form Steps */
+.form-step {
+    display: none;
+}
+
+.form-step.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.form-step h2 {
+    font-size: 1.35rem;
+    margin-bottom: 1.25rem;
+    color: var(--primary-blue);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.step-subtitle {
+    color: #636e72;
+    font-size: 0.92rem;
+    margin-top: -0.8rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--dark-text);
+}
+
+.form-group label .required-mark {
+    color: var(--happy-orange);
+    margin-left: 2px;
+}
+
+.form-group label .optional-badge {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #a0aec0;
+    margin-left: 4px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.9rem 1.1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-family: 'Nunito', sans-serif;
+    color: var(--dark-text);
+    background: #fafbfc;
+    transition: all 0.25s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    background: white;
+    box-shadow: 0 0 0 4px rgba(74, 144, 217, 0.12);
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.825rem;
+    color: #718096;
+}
+
+.form-info {
+    text-align: center;
+    color: #636e72;
+    padding: 1.5rem;
+    background: var(--light-bg);
+    border-radius: 12px;
+    font-size: 0.95rem;
+}
+
+/* Class Options */
+.class-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.class-option input {
+    display: none;
+}
+
+.class-card-select {
+    padding: 1.4rem 1.2rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    height: 100%;
+}
+
+.class-card-select:hover {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+}
+
+.class-option input:checked + .class-card-select {
+    border-color: var(--primary-blue);
+    background: rgba(74, 144, 217, 0.06);
+    box-shadow: 0 8px 24px rgba(74, 144, 217, 0.22);
+    transform: translateY(-3px);
+}
+
+.class-option input:checked + .class-card-select::after {
+    content: '✓ Dipilih';
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    background: var(--primary-blue);
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+}
+
+.class-icon {
+    font-size: 2.2rem;
+    margin-bottom: 0.4rem;
+}
+
+.class-name {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--dark-text);
+    margin-bottom: 0.3rem;
+}
+
+.class-level-badge {
+    display: inline-block;
+    background: rgba(74, 144, 217, 0.15);
+    color: var(--primary-blue);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.725rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.class-card-select .class-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--happy-orange);
+    font-family: 'Baloo 2', cursive;
+    margin-bottom: 0.3rem;
+}
+
+.class-card-select .class-desc {
+    font-size: 0.8rem;
+    color: #636e72;
+    line-height: 1.4;
+}
+
+/* Schedule Options */
+.schedule-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.5rem;
+}
+
+.schedule-option input {
+    display: none;
+}
+
+.schedule-card-select {
+    padding: 1.1rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: white;
+    position: relative;
+}
+
+.schedule-card-select:hover {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+}
+
+.schedule-option input:checked + .schedule-card-select {
+    border-color: var(--fresh-green);
+    background: rgba(107, 203, 119, 0.12);
+    box-shadow: 0 6px 20px rgba(107, 203, 119, 0.22);
+    transform: translateY(-2px);
+}
+
+.schedule-option input:checked + .schedule-card-select::after {
+    content: '✓';
+    position: absolute;
+    top: -8px;
+    right: 10px;
+    background: var(--fresh-green);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.schedule-day {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--dark-text);
+    margin-bottom: 0.25rem;
+}
+
+.schedule-card-select .schedule-time {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--primary-blue);
+    font-family: 'Baloo 2', cursive;
+    margin-bottom: 0.25rem;
+}
+
+.schedule-level {
+    font-size: 0.75rem;
+    color: #718096;
+}
+
+/* Child Form Items (Step 3) */
+.children-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.child-item {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.25rem;
+    position: relative;
+    transition: all 0.25s;
+}
+
+.child-item:hover {
+    border-color: #cbd5e1;
+}
+
+.child-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.child-item-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--primary-blue);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.btn-remove-child {
+    background: #fee2e2;
+    color: #ef4444;
+    border: none;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.btn-remove-child:hover {
+    background: #fecaca;
+    color: #dc2626;
+}
+
+.child-inputs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.btn-add-child {
+    width: 100%;
+    padding: 0.9rem;
+    background: #f0fdf4;
+    color: var(--fresh-green);
+    border: 2px dashed var(--fresh-green);
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: 'Nunito', sans-serif;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn-add-child:hover {
+    background: #dcfce7;
+    border-color: #16a34a;
+    color: #16a34a;
+    transform: translateY(-1px);
+}
+
+.child-count-notice {
+    background: #eff6ff;
+    border-left: 4px solid var(--primary-blue);
+    padding: 0.85rem 1rem;
+    border-radius: 0 10px 10px 0;
+    font-size: 0.85rem;
+    color: #1e40af;
+    margin-bottom: 1rem;
+}
+
+/* Step 4: Summary & Payment Box */
+.summary-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.summary-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.25rem;
+}
+
+.summary-card-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--dark-text);
+    margin-bottom: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.summary-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.85rem;
+}
+
+.summary-item-label {
+    font-size: 0.775rem;
+    color: #718096;
+    margin-bottom: 0.15rem;
+}
+
+.summary-item-val {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--dark-text);
+}
+
+.summary-children-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+
+.summary-child-badge {
+    background: white;
+    border: 1px solid #cbd5e1;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+/* Price Breakdown Box */
+.price-breakdown-card {
+    background: #fffdf5;
+    border: 2px dashed #fcd34d;
+    border-radius: 16px;
+    padding: 1.25rem;
+}
+
+.price-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.price-row.discount-row {
+    color: var(--fresh-green);
+    font-weight: 700;
+}
+
+.price-row.total-row {
+    border-top: 2px solid #fed7aa;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--dark-text);
+}
+
+.total-amount-display {
+    color: var(--happy-orange);
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.35rem;
+}
+
+/* Promo Section */
+.promo-box {
+    margin: 1rem 0 0.5rem;
+}
+
+.promo-input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.promo-input-group input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.btn-promo {
+    padding: 0.75rem 1.25rem;
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: 'Nunito', sans-serif;
+    white-space: nowrap;
+}
+
+.btn-promo:hover {
+    background: #3b7ec4;
+}
+
+#promo-message {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+#promo-message.success {
+    color: var(--fresh-green);
+}
+
+#promo-message.error {
+    color: var(--happy-orange);
+}
+
+/* Payment Method Options */
+.payment-methods-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.payment-method-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.payment-method-card:hover {
+    border-color: #cbd5e1;
+}
+
+.payment-method-card.active {
+    border-color: var(--primary-blue);
+    background: rgba(74, 144, 217, 0.08);
+    box-shadow: 0 4px 14px rgba(74, 144, 217, 0.2);
+}
+
+.payment-method-icon {
+    font-size: 1.6rem;
+}
+
+.payment-method-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--dark-text);
+}
+
+/* Payment Method Details Box */
+.payment-details-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.bank-account-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bank-account-card:last-child {
+    margin-bottom: 0;
+}
+
+.bank-info-name {
+    font-weight: 800;
+    color: var(--primary-blue);
+    font-size: 0.9rem;
+}
+
+.bank-info-number {
+    font-family: monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--dark-text);
+    margin: 0.15rem 0;
+}
+
+.bank-info-holder {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.btn-copy {
+    padding: 0.4rem 0.75rem;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.775rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-copy:hover {
+    background: #e2e8f0;
+}
+
+.btn-copy.copied {
+    background: var(--fresh-green);
+    color: white;
+    border-color: var(--fresh-green);
+}
+
+/* Form Navigation */
+.form-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #edf2f7;
+    gap: 1rem;
+}
+
+.form-navigation button {
+    padding: 0.85rem 1.75rem;
+    border-radius: 50px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    font-size: 0.95rem;
+    transition: all 0.25s;
+    font-family: 'Nunito', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+#prev-btn {
+    background: #edf2f7;
+    color: #4a5568;
+}
+
+#prev-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+}
+
+#prev-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#next-btn {
+    background: linear-gradient(135deg, var(--happy-orange), #ff8c42);
+    color: white;
+    box-shadow: 0 4px 16px rgba(255, 107, 53, 0.3);
+}
+
+#next-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+}
+
+.btn-submit {
+    background: linear-gradient(135deg, var(--fresh-green), #48bb78) !important;
+    color: white !important;
+    box-shadow: 0 4px 16px rgba(107, 203, 119, 0.3) !important;
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(107, 203, 119, 0.4) !important;
+}
+
+/* Hidden helper */
+.hidden {
+    display: none !important;
+}
+
+/* Success Modal / Result View */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1.5rem;
+}
+
+.modal-content {
+    background: white;
+    padding: 2.25rem;
+    border-radius: 24px;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@keyframes modalPop {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.success-icon {
+    font-size: 3.8rem;
+    margin-bottom: 0.5rem;
+    animation: bounce 1.5s infinite;
+}
+
+.modal-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.4rem;
+    color: var(--dark-text);
+}
+
+.modal-content p.success-sub {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+
+.reg-number-card {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 2px solid var(--fresh-green);
+    border-radius: 16px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.reg-number-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #166534;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.35rem;
+}
+
+.reg-number-val {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #14532d;
+    letter-spacing: 1px;
+}
+
+.btn-copy-reg {
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.9rem;
+    background: white;
+    border: 1px solid var(--fresh-green);
+    color: #166534;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-copy-reg:hover {
+    background: #166534;
+    color: white;
+}
+
+.success-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.btn-track-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.9rem;
+    background: linear-gradient(135deg, var(--primary-blue), #3b82f6);
+    color: white;
+    text-decoration: none;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: all 0.25s;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+}
+
+.btn-track-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.4);
+}
+
+.btn-wa-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.85rem;
+    background: #25d366;
+    color: white;
+    text-decoration: none;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: all 0.25s;
+}
+
+.btn-wa-action:hover {
+    background: #1ebc59;
+}
+
+.btn-home-action {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.btn-home-action:hover {
+    color: var(--dark-text);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .form-card {
+        padding: 1.75rem 1.25rem;
+    }
+
+    .class-options,
+    .schedule-options,
+    .child-inputs-grid,
+    .payment-methods-grid,
+    .summary-details-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stepper-steps {
+        gap: 0.25rem;
+    }
+
+    .step-title {
+        font-size: 0.7rem;
+    }
+
+    .step-number {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+    }
+
+    .form-navigation {
+        flex-direction: column-reverse;
+        gap: 0.75rem;
+    }
+
+    .form-navigation button {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
+    }
+
+    .btn-promo {
+        min-height: 44px;
+    }
+
+    .meet-banner {
+        flex-direction: column;
+        text-align: center;
+    }
+}
