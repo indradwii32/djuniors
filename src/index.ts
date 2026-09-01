@@ -74,7 +74,13 @@ const allowedOrigins = (env: Bindings): string | string[] => {
     }
     // Default: open for dev, restrict for production deploy
     return env.ENVIRONMENT === 'production'
-        ? ['https://djuniors.id', 'https://admin.djuniors.id', 'https://www.djuniors.id']
+        ? [
+            'https://djuniors.id',
+            'https://admin.djuniors.id',
+            'https://www.djuniors.id',
+            'https://djuniors-pages.pages.dev',
+            'https://djuniors-admin.pages.dev',
+          ]
         : '*';
 };
 const corsMiddleware = (env: Bindings) => cors({
