@@ -75,9 +75,9 @@ const allowedOrigins = (env: Bindings): string | string[] => {
     // Default: open for dev, restrict for production deploy
     return env.ENVIRONMENT === 'production'
         ? [
-            'https://djuniors.id',
-            'https://admin.djuniors.id',
-            'https://www.djuniors.id',
+            'https://djuniorslc.com',
+            'https://www.djuniorslc.com',
+            'https://admin.djuniorslc.com',
             'https://djuniors-pages.pages.dev',
             'https://djuniors-admin.pages.dev',
           ]

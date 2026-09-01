@@ -89,6 +89,12 @@ TURNSTILE_SITE_KEY = ""         # site-visible key, safe in vars
 [env.production]
 vars = { ENVIRONMENT = "production", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "" }
 
+# Custom domain for API
+workers_dev = true
+routes = [
+  { pattern = "api.djuniorslc.com", custom_domain = true }
+]
+
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "djuniors-db"
