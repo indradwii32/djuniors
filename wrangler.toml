@@ -21,13 +21,11 @@
 name = "djuniors-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
-account_id = "f67b92a3c3dcbe3e90ab6277253c05b5"
+account_id = "d8ec2416780269a92e97345394f74945"
 
-# Worker CPU limit (default 50ms on free; lowering caps runaway requests earlier
-# and reduces CPU-billed time so we stay well under any pay-as-you-go threshold
-# should the account one day graduate to a paid plan).
-[limits]
-cpu_ms = 10
+# Worker CPU limit — not supported on free plan; remove if deploying to free tier.
+# [limits]
+# cpu_ms = 10
 
 # ============================================
 # D1 Database
@@ -37,7 +35,7 @@ cpu_ms = 10
 [[d1_databases]]
 binding = "DB"
 database_name = "djuniors-db"
-database_id = "<YOUR_D1_DATABASE_ID>" # → `wrangler d1 create djuniors-db`
+database_id = "085dd28b-dc9f-417b-adce-e48183d6fb47" # → `wrangler d1 create djuniors-db`
 
 # ============================================
 # R2 Storage (file/media uploads)
@@ -54,7 +52,7 @@ bucket_name = "djuniors-files"
 # Then replace id with the returned value.
 [[kv_namespaces]]
 binding = "KV"
-id = "<YOUR_KV_NAMESPACE_ID>" # → `wrangler kv namespace create DJUNIORS_KV`
+id = "d6f364143c6543f5bc6c5d9e776c73f2" # → `wrangler kv namespace create DJUNIORS_KV`
 
 # ============================================
 # Environment variables
@@ -94,11 +92,11 @@ vars = { ENVIRONMENT = "production", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURN
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "djuniors-db"
-database_id = "<YOUR_D1_DATABASE_ID>"
+database_id = "085dd28b-dc9f-417b-adce-e48183d6fb47"
 
 [[env.production.kv_namespaces]]
 binding = "KV"
-id = "<YOUR_KV_NAMESPACE_ID>"
+id = "d6f364143c6543f5bc6c5d9e776c73f2"
 
 [[env.production.r2_buckets]]
 binding = "R2"
@@ -110,11 +108,11 @@ vars = { ENVIRONMENT = "staging", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTI
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "djuniors-db"
-database_id = "<YOUR_D1_DATABASE_ID>"
+database_id = "085dd28b-dc9f-417b-adce-e48183d6fb47"
 
 [[env.staging.kv_namespaces]]
 binding = "KV"
-id = "<YOUR_KV_NAMESPACE_ID>"
+id = "d6f364143c6543f5bc6c5d9e776c73f2"
 
 [[env.staging.r2_buckets]]
 binding = "R2"

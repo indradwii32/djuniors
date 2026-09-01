@@ -225,12 +225,7 @@ VALUES
     -- Social links: each entry has {platform, label, url, icon} (icon is an emoji or short text).
     -- Empty `url` means the platform is hidden from the footer until admin fills it in.
     ('cms-ftr-06', 'footer', 'social_links',
-        '[{"platform":"facebook","label":"Facebook Djuniors","url":"https://facebook.com/djuniors","icon":"📘","order":1},'
-        '{"platform":"instagram","label":"Instagram Djuniors","url":"https://instagram.com/djuniors","icon":"📸","order":2},'
-        '{"platform":"tiktok","label":"TikTok Djuniors","url":"https://tiktok.com/@djuniors","icon":"🎵","order":3},'
-        '{"platform":"youtube","label":"YouTube Djuniors","url":"https://youtube.com/@djuniors","icon":"📺","order":4},'
-        '{"platform":"whatsapp","label":"WhatsApp Djuniors","url":"https://wa.me/6281234567890","icon":"💬","order":5},'
-        '{"platform":"telegram","label":"Telegram Djuniors","url":"","icon":"✈️","order":6}]',
+        '[{"platform":"facebook","label":"Facebook Djuniors","url":"https://facebook.com/djuniors","icon":"📘","order":1},{"platform":"instagram","label":"Instagram Djuniors","url":"https://instagram.com/djuniors","icon":"📸","order":2},{"platform":"tiktok","label":"TikTok Djuniors","url":"https://tiktok.com/@djuniors","icon":"🎵","order":3},{"platform":"youtube","label":"YouTube Djuniors","url":"https://youtube.com/@djuniors","icon":"📺","order":4},{"platform":"whatsapp","label":"WhatsApp Djuniors","url":"https://wa.me/6281234567890","icon":"💬","order":5},{"platform":"telegram","label":"Telegram Djuniors","url":"","icon":"✈️","order":6}]',
         'json'),
 
     -- Hero
