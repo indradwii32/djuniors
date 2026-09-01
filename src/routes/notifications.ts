@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
-import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, checkFonnteStatus } from '../utils/fonnte';
+import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, checkFonnteStatus, getFonnteToken } from '../utils/fonnte';
 
 const notifications = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -565,7 +565,7 @@ notifications.post('/wa', async (c) => {
 
     // Send via Fonnte
     const result = await sendWAFonnte(
-        { token: c.env.WA_FONNTE_TOKEN },
+        { token: await getFonnteToken(c.env) },
         phone,
         message,
         { typing: true, delay: 1000 }
@@ -632,7 +632,7 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
         );
 
         const result = await sendWAFonnte(
-            { token: c.env.WA_FONNTE_TOKEN },
+            { token: await getFonnteToken(c.env) },
             user.phone as string,
             waMessage,
             { typing: true, delay: 1000 }
@@ -659,14 +659,40 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
 
 // Check Fonnte status
 notifications.get('/wa/status', async (c) => {
+    const token = await getFonnteToken(c.env);
     const isConnected = await checkFonnteStatus({
-        token: c.env.WA_FONNTE_TOKEN
+        token
     });
 
     return c.json({
         connected: isConnected,
         provider: 'Fonnte'
     });
+});
+
+// Get current Fonnte token (masked) — admin only
+notifications.get('/fonnte/token', adminAuthMiddleware, async (c) => {
+    const token = await getFonnteToken(c.env);
+    // Mask: show first 4 + last 4 chars
+    const masked = token.length > 8
+        ? token.slice(0, 4) + '•'.repeat(token.length - 8) + token.slice(-4)
+        : token ? '••••••••' : '';
+    return c.json({ token: masked, isSet: token.length > 0 });
+});
+
+// Save Fonnte token — admin only
+notifications.put('/fonnte/token', adminAuthMiddleware, async (c) => {
+    const { token } = await c.req.json<{ token: string }>();
+    if (!token || token.trim() === '') {
+        return c.json({ error: 'Token is required' }, 400);
+    }
+
+    await c.env.DB.prepare(
+        `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+    ).bind('fonnte_token', token.trim()).run();
+
+    return c.json({ success: true, message: 'Fonnte token saved' });
 });
 
 export default notifications;

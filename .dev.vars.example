@@ -15,7 +15,8 @@
 # per the DEPLOY.md guide.
 
 # Fonnte.io — WhatsApp notifications
-# Sign up at https://fonnte.com, get a token from the dashboard, paste below.
+# NOTE: For local dev, you can also set this via dashboard Settings → WhatsApp Gateway.
+# This env var is only a fallback.
 WA_FONNTE_TOKEN=your_fonnte_token_here
 
 # JWT signing key — used to sign admin + user auth tokens.

@@ -113,10 +113,10 @@ After wrangler.toml has real IDs:
        npm run db:init:remote
        npm run db:seed:remote    # only if your D1 is empty
 
-  2. Set secrets (you'll be prompted for each value):
-       wrangler secret put WA_FONNTE_TOKEN
-       wrangler secret put JWT_SECRET
-       wrangler secret put TURNSTILE_SECRET
+   2. Set secrets (you'll be prompted for each value):
+        wrangler secret put TURNSTILE_SECRET
+        # Optional: wrangler secret put JWT_SECRET (auto-generated in D1 if omitted)
+        # Note: Fonnte token can be configured in dashboard Settings → WhatsApp Gateway
 
   3. Build the dashboard:
        npm run dashboard:build

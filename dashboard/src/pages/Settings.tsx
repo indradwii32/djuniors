@@ -59,8 +59,9 @@ export const Settings: React.FC = () => {
 
   // WhatsApp State
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
-  const [waToken, setWaToken] = useState<string>('••••••••••••••••••••••••');
+  const [waToken, setWaToken] = useState<string>('');
   const [isTestingWa, setIsTestingWa] = useState<boolean>(false);
+  const [isSavingWaToken, setIsSavingWaToken] = useState<boolean>(false);
   const [waAutoNotifyEnroll, setWaAutoNotifyEnroll] = useState<boolean>(true);
   const [waAutoNotifyPayment, setWaAutoNotifyPayment] = useState<boolean>(true);
   const [waAutoNotifyReminder, setWaAutoNotifyReminder] = useState<boolean>(true);
@@ -89,9 +90,10 @@ export const Settings: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [banksRes, waRes] = await Promise.allSettled([
+      const [banksRes, waRes, tokenRes] = await Promise.allSettled([
         paymentsApi.getBanks(),
         notificationsApi.getWaStatus(),
+        notificationsApi.getFonnteToken(),
       ]);
 
       if (banksRes.status === 'fulfilled' && Array.isArray(banksRes.value) && banksRes.value.length > 0) {
@@ -104,6 +106,10 @@ export const Settings: React.FC = () => {
         setWaConnected(waRes.value.connected);
       } else {
         setWaConnected(false);
+      }
+
+      if (tokenRes.status === 'fulfilled' && tokenRes.value.isSet) {
+        setWaToken(tokenRes.value.token);
       }
     } catch {
       // fallback
@@ -142,6 +148,36 @@ export const Settings: React.FC = () => {
     showToast('Rekening pembayaran baru berhasil ditambahkan!');
     setIsAddBankModalOpen(false);
     setNewAccountNumber('');
+  };
+
+  const handleSaveWaToken = async () => {
+    if (!waToken || waToken.trim() === '' || waToken.includes('•')) {
+      showToast('Masukkan token Fonnte yang valid', 'error');
+      return;
+    }
+    try {
+      setIsSavingWaToken(true);
+      const res = await notificationsApi.saveFonnteToken(waToken.trim());
+      if (res.success) {
+        showToast('Token Fonnte berhasil disimpan!');
+        const [waRes, tokenRes] = await Promise.allSettled([
+          notificationsApi.getWaStatus(),
+          notificationsApi.getFonnteToken(),
+        ]);
+        if (waRes.status === 'fulfilled') {
+          setWaConnected(waRes.value.connected);
+        }
+        if (tokenRes.status === 'fulfilled' && tokenRes.value.isSet) {
+          setWaToken(tokenRes.value.token);
+        }
+      } else {
+        showToast(res.message || 'Gagal menyimpan token Fonnte', 'error');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan token Fonnte', 'error');
+    } finally {
+      setIsSavingWaToken(false);
+    }
   };
 
   const handleTestWa = async () => {
@@ -541,13 +577,47 @@ export const Settings: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
                   Fonnte API Token
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <input
                     type="password"
                     value={waToken}
-                    onChange={(e) => setWaToken(e.target.value)}
-                    style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (waToken.includes('•')) {
+                        setWaToken(val.replace(/•/g, ''));
+                      } else {
+                        setWaToken(val);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (waToken.includes('•')) {
+                        setWaToken('');
+                      }
+                    }}
+                    placeholder="Masukkan token Fonnte"
+                    style={{ flex: 1, minWidth: '200px', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                   />
+                  <button
+                    onClick={handleSaveWaToken}
+                    disabled={isSavingWaToken || !waToken.trim() || waToken.includes('•')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '0.65rem 1.25rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: (isSavingWaToken || !waToken.trim() || waToken.includes('•')) ? 'not-allowed' : 'pointer',
+                      opacity: (isSavingWaToken || !waToken.trim() || waToken.includes('•')) ? 0.6 : 1,
+                    }}
+                  >
+                    <Save size={14} />
+                    <span>{isSavingWaToken ? 'Menyimpan...' : 'Simpan Token'}</span>
+                  </button>
                   <button
                     onClick={handleTestWa}
                     disabled={isTestingWa}
@@ -562,7 +632,7 @@ export const Settings: React.FC = () => {
                       color: '#FFFFFF',
                       fontSize: '0.85rem',
                       fontWeight: 700,
-                      cursor: 'pointer',
+                      cursor: isTestingWa ? 'not-allowed' : 'pointer',
                     }}
                   >
                     <RefreshCw size={14} className={isTestingWa ? 'animate-spin' : ''} />

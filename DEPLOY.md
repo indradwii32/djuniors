@@ -84,15 +84,14 @@ npm run db:reset:remote
 Plaintext secrets never go into `wrangler.toml` — use `wrangler secret put`:
 
 ```bash
-wrangler secret put WA_FONNTE_TOKEN
-wrangler secret put JWT_SECRET
 wrangler secret put TURNSTILE_SECRET
 ```
 
-Each command prompts for the value. wrangler encrypts it at rest in Cloudflare
-and exposes it via `c.env.JWT_SECRET` etc. at runtime.
+Each command prompts for the value. wrangler encrypts it at rest in Cloudflare.
 
-> **Tip:** Generate a fresh JWT secret with `openssl rand -base64 48`.
+> **Notes on JWT_SECRET & WA_FONNTE_TOKEN:**
+> - `JWT_SECRET` is now **auto-generated** on first request and persisted to the D1 `settings` table (no manual setup required). You can optionally override it via `wrangler secret put JWT_SECRET` if you want a custom secret.
+> - `WA_FONNTE_TOKEN` is configured directly from the admin dashboard (**Settings → WhatsApp Gateway**) and saved to the D1 database. The env var is only kept as an optional fallback.
 
 ### 5. Build the dashboard
 

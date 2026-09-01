@@ -2,6 +2,33 @@
 // Djuniors - Fonnte WhatsApp API Integration
 // ============================================
 
+// Fonnte token management — stored in D1 settings table, editable from dashboard Settings.
+// Falls back to env var WA_FONNTE_TOKEN for backward compatibility.
+
+const FONNTE_TOKEN_KEY = 'fonnte_token';
+
+export async function getFonnteToken(env: { DB: D1Database; WA_FONNTE_TOKEN?: string }): Promise<string> {
+    // 1. Try D1 settings table first (dashboard-editable)
+    try {
+        const row = await env.DB.prepare(
+            `SELECT value FROM settings WHERE key = ?`
+        ).bind(FONNTE_TOKEN_KEY).first<{ value: string }>();
+
+        if (row?.value && row.value.trim() !== '') {
+            return row.value;
+        }
+    } catch {
+        // Table might not exist yet
+    }
+
+    // 2. Fallback to env var (backward compat)
+    if (env.WA_FONNTE_TOKEN && env.WA_FONNTE_TOKEN.trim() !== '') {
+        return env.WA_FONNTE_TOKEN;
+    }
+
+    return '';
+}
+
 export interface FonnteConfig {
     token: string;
     baseUrl?: string;

@@ -4,7 +4,7 @@
 
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { createJWT, hashPassword, verifyPassword } from '../utils/jwt';
+import { createJWT, hashPassword, verifyPassword, getJwtSecret } from '../utils/jwt';
 import { authMiddleware } from '../middleware/auth';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -63,7 +63,7 @@ auth.post('/register', async (c) => {
         email,
         role: 'parent',
         type: 'user'
-    }, c.env.JWT_SECRET, 7 * 24); // 7 days
+    }, await getJwtSecret(c.env), 7 * 24); // 7 days
 
     // Store session in KV
     await c.env.KV.put(`session:${userId}`, token, {
@@ -108,7 +108,7 @@ auth.post('/login', async (c) => {
         email: user.email as string,
         role: user.role as string,
         type: 'user'
-    }, c.env.JWT_SECRET, 7 * 24);
+    }, await getJwtSecret(c.env), 7 * 24);
 
     // Store session
     await c.env.KV.put(`session:${user.id}`, token, {
@@ -161,7 +161,7 @@ auth.post('/admin/login', async (c) => {
         username: admin.username as string,
         role: admin.role as string,
         type: 'admin'
-    }, c.env.JWT_SECRET, 24); // 24 hours
+    }, await getJwtSecret(c.env), 24); // 24 hours
 
     // Store session in KV
     await c.env.KV.put(`admin-session:${admin.id}`, token, {

@@ -4,6 +4,47 @@
 
 import { JWTPayload } from '../types';
 
+// JWT secret management — auto-generate on first use, persist to D1 settings table.
+// Priority: 1. env var JWT_SECRET (wrangler secret put) → 2. D1 settings table → 3. auto-generate + store
+
+const JWT_SECRET_KEY = 'jwt_secret';
+
+export async function getJwtSecret(env: { DB: D1Database; JWT_SECRET?: string }): Promise<string> {
+    // 1. If explicitly set via env var (wrangler secret), use that
+    if (env.JWT_SECRET && env.JWT_SECRET.trim() !== '' && env.JWT_SECRET !== 'djuniors-local-dev-secret-change-me') {
+        return env.JWT_SECRET;
+    }
+
+    // 2. Try to read from D1 settings table
+    try {
+        const row = await env.DB.prepare(
+            `SELECT value FROM settings WHERE key = ?`
+        ).bind(JWT_SECRET_KEY).first<{ value: string }>();
+
+        if (row?.value && row.value.length >= 32) {
+            return row.value;
+        }
+    } catch {
+        // Table might not exist yet (first deploy before schema applied)
+    }
+
+    // 3. Auto-generate a new secret (64 chars hex) and store it
+    const bytes = new Uint8Array(48);
+    crypto.getRandomValues(bytes);
+    const secret = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    try {
+        await env.DB.prepare(
+            `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+        ).bind(JWT_SECRET_KEY, secret).run();
+    } catch {
+        // If store fails, still return the secret (in-memory for this request)
+    }
+
+    return secret;
+}
+
 /**
  * Create a JWT token
  */

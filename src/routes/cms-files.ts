@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables, CMSFile } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
-import { verifyJWT } from '../utils/jwt';
+import { verifyJWT, getJwtSecret } from '../utils/jwt';
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
 
 const cmsFiles = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -192,7 +192,7 @@ cmsFiles.get('/', cache, async (c) => {
         let isAdmin = false;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             const token = authHeader.split(' ')[1];
-            const payload = await verifyJWT(token, c.env.JWT_SECRET);
+            const payload = await verifyJWT(token, await getJwtSecret(c.env));
             if (payload && payload.type === 'admin') {
                 const session = await c.env.KV.get(`admin-session:${payload.userId}`);
                 if (session) {

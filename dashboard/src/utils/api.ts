@@ -765,6 +765,15 @@ export const notificationsApi = {
       }),
     });
   },
+  getFonnteToken: async (): Promise<{ token: string; isSet: boolean }> => {
+    return apiRequest<{ token: string; isSet: boolean }>('/notifications/fonnte/token');
+  },
+  saveFonnteToken: async (token: string): Promise<{ success: boolean; message: string }> => {
+    return apiRequest<{ success: boolean; message: string }>('/notifications/fonnte/token', {
+      method: 'PUT',
+      body: JSON.stringify({ token }),
+    });
+  },
 };
 
 // Levels Endpoints

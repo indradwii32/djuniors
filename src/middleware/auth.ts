@@ -4,7 +4,7 @@
 
 import { Context, Next } from 'hono';
 import { Bindings, Variables } from '../types';
-import { verifyJWT } from '../utils/jwt';
+import { verifyJWT, getJwtSecret } from '../utils/jwt';
 
 /**
  * JWT Auth Middleware (for regular users)
@@ -17,7 +17,7 @@ export const authMiddleware = async (c: Context<{ Bindings: Bindings; Variables:
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await verifyJWT(token, c.env.JWT_SECRET);
+    const payload = await verifyJWT(token, await getJwtSecret(c.env));
 
     if (!payload) {
         return c.json({ error: 'Invalid token' }, 401);
@@ -38,7 +38,7 @@ export const adminAuthMiddleware = async (c: Context<{ Bindings: Bindings; Varia
     }
 
     const token = authHeader.split(' ')[1];
-    const payload = await verifyJWT(token, c.env.JWT_SECRET);
+    const payload = await verifyJWT(token, await getJwtSecret(c.env));
 
     if (!payload || payload.type !== 'admin') {
         return c.json({ error: 'Invalid admin token' }, 401);

@@ -6,8 +6,8 @@ export interface Bindings {
     DB: D1Database;
     R2: R2Bucket;
     KV: KVNamespace;
-    WA_FONNTE_TOKEN: string;
-    JWT_SECRET: string;
+    WA_FONNTE_TOKEN?: string;
+    JWT_SECRET?: string;
     TURNSTILE_SECRET: string;
     TURNSTILE_SITE_KEY: string;
     ENVIRONMENT: string;
