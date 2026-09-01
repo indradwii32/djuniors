@@ -89,12 +89,36 @@ TURNSTILE_SITE_KEY = ""         # site-visible key, safe in vars
 # `wrangler dev` always uses local .dev.vars + miniflare (no env-specific vars).
 
 [env.production]
-vars = { ENVIRONMENT = "production" }
-# name override optional:
-# name = "djuniors-api"
+vars = { ENVIRONMENT = "production", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "djuniors-db"
+database_id = "<YOUR_D1_DATABASE_ID>"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "<YOUR_KV_NAMESPACE_ID>"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "djuniors-files"
 
 [env.staging]
-vars = { ENVIRONMENT = "staging" }
+vars = { ENVIRONMENT = "staging", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "djuniors-db"
+database_id = "<YOUR_D1_DATABASE_ID>"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "<YOUR_KV_NAMESPACE_ID>"
+
+[[env.staging.r2_buckets]]
+binding = "R2"
+bucket_name = "djuniors-files"
 
 # ============================================
 # Cron Triggers (Task: dashboard snapshots)

@@ -4,29 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-
+    "deploy": "wrangler deploy --env production",
     "setup:cf": "bash ./setup-cf.sh",
-
     "db:init": "wrangler d1 execute djuniors-db --local --file=schema.sql",
     "db:init:remote": "wrangler d1 execute djuniors-db --remote --file=schema.sql",
     "db:seed": "wrangler d1 execute djuniors-db --local --file=seed.sql",
     "db:seed:remote": "wrangler d1 execute djuniors-db --remote --file=seed.sql",
     "db:reset:remote": "wrangler d1 execute djuniors-db --remote --file=schema.sql && wrangler d1 execute djuniors-db --remote --file=seed.sql",
-
     "pre-deploy:check": "npx tsc --noEmit && npx wrangler deploy --dry-run",
-
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
     "dashboard:build:prod": "cd dashboard && VITE_API_BASE=https://api.djuniors.id npm run build",
     "pages:deploy": "wrangler pages deploy public --project-name=djuniors-pages",
     "pages:deploy:admin": "cd dashboard && npm run build && wrangler pages deploy dist --project-name=djuniors-admin",
-
     "deploy:all": "npm run dashboard:build && wrangler deploy && npm run pages:deploy",
     "deploy:all:admin": "npm run deploy:all && npm run pages:deploy:admin",
     "deploy:api": "wrangler deploy",
     "deploy:pages": "npm run pages:deploy && npm run pages:deploy:admin",
-
     "test:smoke:taskB": "node /home/drainz/.hermes/cache/smoke-taskB.cjs",
     "test:smoke:taskC": "node /home/drainz/.hermes/cache/smoke-taskC2.cjs",
     "test:smoke:taskD": "node /home/drainz/.hermes/cache/smoke-taskD.cjs",
@@ -37,8 +31,8 @@
     "hono": "^4.0.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.0.0",
+    "@cloudflare/workers-types": "^5.20260901.1",
     "typescript": "^5.0.0",
-    "wrangler": "^3.0.0"
+    "wrangler": "^4.127.1"
   }
 }
