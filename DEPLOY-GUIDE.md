@@ -87,9 +87,10 @@ Script ini akan memandu Anda membuat:
 - **R2 bucket** (`djuniors-files`)
 - **KV namespace** (`DJUNIORS_KV`) → copy `id` yang muncul
 
-Lalu paste kedua UUID ke `wrangler.toml`:
+Lalu paste kedua UUID ke `wrangler.toml` — **di 3 tempat** (top-level, `[env.production]`, `[env.staging]`):
 
 ```toml
+# Top-level (untuk local dev)
 [[d1_databases]]
 binding = "DB"
 database_name = "djuniors-db"
@@ -98,6 +99,20 @@ database_id = "PASTE-D1-UUID-DISINI"   # ← ganti ini
 [[kv_namespaces]]
 binding = "KV"
 id = "PASTE-KV-UUID-DISINI"            # ← ganti ini
+
+# [env.production] — cari section ini, ganti juga
+[[env.production.d1_databases]]
+database_id = "PASTE-D1-UUID-DISINI"   # ← sama dengan di atas
+
+[[env.production.kv_namespaces]]
+id = "PASTE-KV-UUID-DISINI"            # ← sama dengan di atas
+
+# [env.staging] — sama juga
+[[env.staging.d1_databases]]
+database_id = "PASTE-D1-UUID-DISINI"
+
+[[env.staging.kv_namespaces]]
+id = "PASTE-KV-UUID-DISINI"
 ```
 
 > **Note:** `account_id` sudah ter-set di `wrangler.toml`. Jika akun berbeda, update dari `wrangler whoami`.
@@ -231,18 +246,29 @@ Setelah custom domain aktif:
 
 ## Update & Redeploy
 
-Setelah push perubahan ke GitHub:
-
 ```bash
+# Pull latest dari GitHub
 git pull origin main
+
+# Install dependencies (jika ada perubahan package.json)
+npm install
+cd dashboard && npm install && cd ..
+
+# Sanity check
 npm run pre-deploy:check
+
+# Deploy semuanya
 npm run deploy:all:admin
 ```
 
-Untuk update API saja:
+Untuk update komponen spesifik:
 ```bash
-npm run deploy:api
+npm run deploy:api          # Workers API saja
+npm run pages:deploy        # Landing page saja
+npm run pages:deploy:admin  # Dashboard admin saja
 ```
+
+> **Note:** Project ini pakai wrangler v4 — `--env production` sudah include di script `deploy`.
 
 ---
 
