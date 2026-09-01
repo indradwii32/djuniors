@@ -55,6 +55,10 @@ npm run setup:cf
 
 This interactive helper walks through:
 
+> **Note:** `account_id` is already set in `wrangler.toml` (from `wrangler whoami`).
+> If you ever need to change accounts, run `wrangler whoami` to get the new ID
+> and update the `account_id` field manually.
+
 - D1 database creation → outputs a `database_id` you paste into `wrangler.toml`
 - R2 bucket creation (just confirm; no IDs needed in `wrangler.toml`)
 - KV namespace creation → outputs a namespace `id` you paste into `wrangler.toml`

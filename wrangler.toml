@@ -21,6 +21,7 @@
 name = "djuniors-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
+account_id = "f67b92a3c3dcbe3e90ab6277253c05b5"
 
 # Worker CPU limit (default 50ms on free; lowering caps runaway requests earlier
 # and reduces CPU-billed time so we stay well under any pay-as-you-go threshold
