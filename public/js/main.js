@@ -4,6 +4,20 @@
 
 const API_BASE = window.API_BASE || (window.location.origin && window.location.origin.includes(':8787') ? '' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://api.djuniorslc.com'));
 
+/**
+ * Resolve media URL — ensures relative /api/ paths point to API_BASE
+ */
+function resolveMediaUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+        return url;
+    }
+    if (url.startsWith('/api/')) {
+        return `${API_BASE}${url}`;
+    }
+    return url;
+}
+
 // ============================================
 // Fallback Default Content
 // ============================================
@@ -323,7 +337,7 @@ async function fetchMedia(type = '') {
 async function fetchLogo() {
     try {
         const data = await fetchMedia('logo');
-        return data?.file?.file_url || null;
+        return resolveMediaUrl(data?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching logo:', error);
         return null;
@@ -337,7 +351,7 @@ async function fetchLogo() {
 async function fetchFavicon() {
     try {
         const data = await fetchMedia('favicon');
-        return data?.file?.file_url || null;
+        return resolveMediaUrl(data?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching favicon:', error);
         return null;
@@ -351,9 +365,9 @@ async function fetchFavicon() {
 async function fetchHeroImage() {
     try {
         const data = await fetchMedia('hero_image');
-        if (data?.file?.file_url) return data.file.file_url;
+        if (data?.file?.file_url) return resolveMediaUrl(data.file.file_url);
         const fallbackHero = await fetchMedia('hero');
-        return fallbackHero?.file?.file_url || null;
+        return resolveMediaUrl(fallbackHero?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching hero image:', error);
         return null;
@@ -367,7 +381,11 @@ async function fetchHeroImage() {
 async function fetchClassImages() {
     try {
         const data = await fetchMedia('class_image');
-        return data?.files || (data?.file ? [data.file] : []);
+        const list = data?.files || (data?.file ? [data.file] : []);
+        return list.map(item => ({
+            ...item,
+            file_url: resolveMediaUrl(item.file_url)
+        }));
     } catch (error) {
         console.warn('Error fetching class images:', error);
         return [];
@@ -566,7 +584,7 @@ function renderFavicon(faviconUrl) {
  * Hero is the LCP image — load eagerly at native size.
  */
 function renderHeroImage(heroImageUrl) {
-    const activeHeroUrl = heroImageUrl || DEFAULT_HERO_IMAGE;
+    const activeHeroUrl = resolveMediaUrl(heroImageUrl) || DEFAULT_HERO_IMAGE;
     const heroImg = document.getElementById('hero-image');
     if (!heroImg) return;
 
@@ -587,6 +605,7 @@ function renderHeroImage(heroImageUrl) {
 
     heroImg.onerror = function() {
         this.onerror = null;
+        this.removeAttribute('srcset');
         this.src = DEFAULT_HERO_IMAGE;
     };
 }
