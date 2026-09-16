@@ -4,6 +4,48 @@
 
 const API_BASE = window.API_BASE || (window.location.origin.includes(':8787') ? '' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://api.djuniorslc.com'));
 
+/**
+ * Resolve media URL with API_BASE
+ */
+function resolveMediaUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+    if (url.startsWith('/api/')) return `${API_BASE}${url}`;
+    return url;
+}
+
+/**
+ * Level-specific fallback Hero SVG for class cards
+ */
+function getClassFallbackSvg(cls) {
+    if (!cls) return 'images/level-foundation-hero.svg';
+    const nameLower = (cls.name || '').toLowerCase();
+    const levelId = cls.level_id || '';
+    if (nameLower.includes('private')) {
+        return 'images/level-private-hero.svg';
+    }
+    if (levelId === 'level-development' || nameLower.includes('development') || nameLower.includes('sd kelas 4')) {
+        return 'images/level-development-hero.svg';
+    }
+    if (levelId === 'level-progress' || nameLower.includes('progress') || nameLower.includes('smp')) {
+        return 'images/level-progress-hero.svg';
+    }
+    return 'images/level-foundation-hero.svg';
+}
+
+/**
+ * Level-specific icon for class badges
+ */
+function getClassIcon(cls) {
+    if (!cls) return '🧮';
+    const nameLower = (cls.name || '').toLowerCase();
+    const levelId = cls.level_id || '';
+    if (nameLower.includes('private')) return '⭐';
+    if (levelId === 'level-development' || nameLower.includes('development') || nameLower.includes('sd kelas 4')) return '🎒';
+    if (levelId === 'level-progress' || nameLower.includes('progress') || nameLower.includes('smp')) return '🚀';
+    return '🐣';
+}
+
 class DjuniorsRegistration {
     constructor() {
         this.currentStep = 1;
@@ -13,6 +55,7 @@ class DjuniorsRegistration {
         this.selectedClass = null;
         this.selectedSlot = null;
         this.selectedPaymentMethod = 'bank_transfer';
+        this.currentLevelFilter = 'all';
 
         this.children = [
             { name: '', age_or_class: '' }
@@ -141,17 +184,36 @@ class DjuniorsRegistration {
             const response = await fetch(`${API_BASE}/api/classes`);
             if (!response.ok) throw new Error('Gagal mengambil data kelas');
             this.classes = await response.json();
-            this.renderClasses();
 
-            // Select default class
+            // Determine active level filter and selected class
             let targetClassId = this.initialClassId;
-            if (!targetClassId && this.initialLevelId) {
-                const matched = this.classes.find(c => c.level_id === this.initialLevelId);
-                if (matched) targetClassId = matched.id;
+            let targetLevelId = this.initialLevelId;
+
+            if (targetClassId) {
+                const matchedClass = this.classes.find(c => c.id === targetClassId);
+                if (matchedClass) {
+                    targetLevelId = matchedClass.level_id || targetLevelId;
+                }
+            } else if (targetLevelId) {
+                const matched = this.classes.find(c => c.level_id === targetLevelId);
+                if (matched) {
+                    targetClassId = matched.id;
+                }
             }
 
+            // Set current level filter (auto-filtered if level or class was selected from landing)
+            this.currentLevelFilter = targetLevelId || 'all';
+
+            // Render Level filter pills
+            this.renderLevelFilter();
+
+            // Render classes (filtered by currentLevelFilter)
+            this.renderClasses();
+
+            // Select default / target class
             if (!targetClassId || !this.classes.some(c => c.id === targetClassId)) {
-                targetClassId = this.classes[0]?.id || null;
+                const visible = this.getVisibleClasses();
+                targetClassId = visible[0]?.id || this.classes[0]?.id || null;
             }
 
             if (targetClassId) {
@@ -166,32 +228,145 @@ class DjuniorsRegistration {
     }
 
     /**
+     * Get classes matching current level filter
+     */
+    getVisibleClasses() {
+        if (!this.currentLevelFilter || this.currentLevelFilter === 'all') {
+            return this.classes;
+        }
+        return this.classes.filter(c => c.level_id === this.currentLevelFilter);
+    }
+
+    /**
+     * Render level filter pills above class cards
+     */
+    renderLevelFilter() {
+        const filterContainer = document.getElementById('level-filter-container');
+        if (!filterContainer) return;
+
+        // Group unique levels from classes
+        const levelMap = new Map();
+        this.classes.forEach(c => {
+            if (c.level_id && !levelMap.has(c.level_id)) {
+                levelMap.set(c.level_id, {
+                    id: c.level_id,
+                    name: c.level_name || c.level_id.replace('level-', ''),
+                    grade_range: c.level_grade_range || '',
+                    icon: getClassIcon(c)
+                });
+            }
+        });
+
+        const levels = Array.from(levelMap.values());
+        if (levels.length === 0) {
+            filterContainer.innerHTML = '';
+            return;
+        }
+
+        const isFiltered = this.currentLevelFilter && this.currentLevelFilter !== 'all';
+        const activeLevel = levels.find(l => l.id === this.currentLevelFilter);
+
+        let pillsHtml = `
+            <button type="button" class="level-filter-pill ${!isFiltered ? 'active' : ''}" data-level="all">
+                <span>⭐</span> Semua Level (${this.classes.length})
+            </button>
+        `;
+
+        levels.forEach(lvl => {
+            const count = this.classes.filter(c => c.level_id === lvl.id).length;
+            const isActive = this.currentLevelFilter === lvl.id;
+            pillsHtml += `
+                <button type="button" class="level-filter-pill ${isActive ? 'active' : ''}" data-level="${lvl.id}">
+                    <span>${lvl.icon}</span> Level ${lvl.name} ${lvl.grade_range ? `(${lvl.grade_range})` : ''}
+                </button>
+            `;
+        });
+
+        let bannerHtml = '';
+        if (isFiltered && activeLevel) {
+            const visibleCount = this.getVisibleClasses().length;
+            bannerHtml = `
+                <div class="level-active-banner">
+                    <span>🎯 Menampilkan <strong>${visibleCount} pilihan kelas</strong> untuk <strong>Level ${activeLevel.name}</strong> ${activeLevel.grade_range ? `(${activeLevel.grade_range})` : ''}</span>
+                    <button type="button" class="btn-filter-reset" data-level="all">Lihat Semua Level</button>
+                </div>
+            `;
+        }
+
+        filterContainer.innerHTML = `
+            <div class="level-filter-header">
+                <span class="level-filter-label">🎯 Pilihan Jenjang / Level:</span>
+            </div>
+            <div class="level-filter-pills">
+                ${pillsHtml}
+            </div>
+            ${bannerHtml}
+        `;
+
+        // Attach click events
+        filterContainer.querySelectorAll('.level-filter-pill, .btn-filter-reset').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetLevel = btn.dataset.level;
+                this.setLevelFilter(targetLevel);
+            });
+        });
+    }
+
+    /**
+     * Set active level filter and update displayed classes
+     */
+    setLevelFilter(levelId) {
+        this.currentLevelFilter = levelId || 'all';
+        this.renderLevelFilter();
+        this.renderClasses();
+
+        // If currently selected class is no longer visible, auto-select first visible class
+        const visible = this.getVisibleClasses();
+        const stillVisible = visible.some(c => c.id === this.selectedClass?.id);
+        if (!stillVisible && visible.length > 0) {
+            this.selectClass(visible[0].id);
+        }
+    }
+
+    /**
      * Render Class Cards (Step 1)
      */
     renderClasses() {
         const container = document.getElementById('class-options');
         if (!container) return;
 
-        if (!this.classes || this.classes.length === 0) {
-            container.innerHTML = '<p class="form-info" style="grid-column: 1/-1;">Tidak ada kelas aktif saat ini.</p>';
+        const visibleClasses = this.getVisibleClasses();
+
+        if (!visibleClasses || visibleClasses.length === 0) {
+            container.innerHTML = `
+                <div class="form-info" style="grid-column: 1/-1; text-align: center;">
+                    <p>Tidak ada kelas untuk level ini.</p>
+                    <button type="button" class="btn-filter-reset" style="margin-top: 0.5rem;" onclick="window.regApp?.setLevelFilter('all')">
+                        Tampilkan Semua Level
+                    </button>
+                </div>
+            `;
             return;
         }
 
-        const icons = ['🧮', '🎒', '🚀', '⭐', '📐', '🐣'];
-        container.innerHTML = this.classes.map((cls, index) => {
-            const icon = icons[index % icons.length];
+        container.innerHTML = visibleClasses.map((cls) => {
+            const icon = getClassIcon(cls);
+            const heroSvg = getClassFallbackSvg(cls);
             const isChecked = cls.id === this.selectedClass?.id;
             const priceFormatted = Number(cls.price) === 0
                 ? 'Gratis'
                 : `Rp ${Number(cls.price).toLocaleString('id-ID')} / bln`;
+            const classImgUrl = resolveMediaUrl(cls.image_url) || heroSvg;
 
             return `
                 <label class="class-option">
                     <input type="radio" name="class_id" value="${cls.id}" ${isChecked ? 'checked' : ''}>
                     <div class="class-card-select">
-                        <div class="class-icon">${icon}</div>
+                        <div class="class-select-hero">
+                            <img src="${classImgUrl}" alt="${cls.name}" onerror="this.onerror=null; this.src='${heroSvg}';">
+                        </div>
                         <div class="class-name">${cls.name}</div>
-                        <div class="class-level-badge">${cls.level_name || 'Semua Tingkat'}</div>
+                        <div class="class-level-badge">${cls.level_name ? `Level ${cls.level_name}` : 'Semua Tingkat'}</div>
                         <div class="class-price">${priceFormatted}</div>
                         <div class="class-desc">${cls.description || 'Live interaktif via Google Meet'}</div>
                     </div>

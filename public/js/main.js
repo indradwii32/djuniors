@@ -142,7 +142,53 @@ const DEFAULT_FAVICON = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/s
 
 const DEFAULT_HERO_IMAGE = 'images/hero-mascot.webp';
 
-const DEFAULT_CLASS_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220"><defs><linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23EBF4FF"/><stop offset="100%" stop-color="%23FFF5EA"/></linearGradient></defs><rect width="400" height="220" rx="14" fill="url(%23cardGrad)"/><circle cx="200" cy="100" r="65" fill="%23FFFFFF" opacity="0.9"/><text x="200" y="108" font-size="60" text-anchor="middle" dominant-baseline="middle">🧮</text><g transform="translate(30, 25)"><circle cx="15" cy="15" r="15" fill="%23FFD93D"/><text x="15" y="21" font-size="15" text-anchor="middle" font-weight="bold" fill="%232D3436">✨</text></g><g transform="translate(340, 25)"><circle cx="15" cy="15" r="15" fill="%236BCB77"/><text x="15" y="21" font-size="15" text-anchor="middle" font-weight="bold" fill="white">★</text></g><rect x="50" y="170" width="300" height="30" rx="15" fill="%23FFFFFF" opacity="0.92"/><text x="200" y="190" font-size="13" font-weight="bold" fill="%234A90D9" text-anchor="middle" font-family="sans-serif">🎮 Kelas Live Interaktif via Meet</text></svg>`;
+const DEFAULT_CLASS_IMAGE = 'images/level-foundation-hero.svg';
+
+/**
+ * Return Level-specific fallback Hero SVG
+ */
+function getClassFallbackSvg(cls) {
+    if (!cls) return 'images/level-foundation-hero.svg';
+    const nameLower = (cls.name || '').toLowerCase();
+    const levelId = cls.level_id || '';
+    if (nameLower.includes('private')) {
+        return 'images/level-private-hero.svg';
+    }
+    if (levelId === 'level-development' || nameLower.includes('development') || nameLower.includes('sd kelas 4')) {
+        return 'images/level-development-hero.svg';
+    }
+    if (levelId === 'level-progress' || nameLower.includes('progress') || nameLower.includes('smp')) {
+        return 'images/level-progress-hero.svg';
+    }
+    return 'images/level-foundation-hero.svg';
+}
+
+/**
+ * Return matching Hero image for a class:
+ * 1. cls.image_url (configured in DB)
+ * 2. CMS uploaded class_image matching this class
+ * 3. Fallback to Level Hero SVG
+ */
+function getClassHeroImage(cls, classImages = []) {
+    if (cls.image_url) {
+        return resolveMediaUrl(cls.image_url);
+    }
+    if (Array.isArray(classImages) && classImages.length > 0) {
+        const matched = classImages.find(img => {
+            if (!img) return false;
+            const meta = typeof img.metadata === 'string' ? parseJsonField(img.metadata, {}) : (img.metadata || {});
+            return (
+                meta.class_id === cls.id ||
+                meta.class_id === String(cls.id) ||
+                (img.name && img.name.toLowerCase().includes((cls.name || '').toLowerCase()))
+            );
+        });
+        if (matched && matched.file_url) {
+            return resolveMediaUrl(matched.file_url);
+        }
+    }
+    return getClassFallbackSvg(cls);
+}
 
 // ============================================
 // Image Optimization helpers (Task F)
@@ -947,12 +993,20 @@ function renderLevels(levels) {
         return;
     }
 
-    const icons = ['🐣', '🎒', '🚀', '🧮', '📐', '⭐'];
-    const colors = ['blue', 'green', 'orange', 'pink'];
+    const levelIcons = {
+        'level-foundation': '🐣',
+        'level-development': '🎒',
+        'level-progress': '🚀'
+    };
+    const levelColors = {
+        'level-foundation': 'blue',
+        'level-development': 'green',
+        'level-progress': 'orange'
+    };
 
     container.innerHTML = levels.map((level, index) => {
-        const icon = icons[index % icons.length];
-        const color = colors[index % colors.length];
+        const icon = levelIcons[level.id] || ['🐣', '🎒', '🚀'][index % 3] || '🧮';
+        const color = levelColors[level.id] || ['blue', 'green', 'orange'][index % 3] || 'blue';
         const ageRange = (level.min_age && level.max_age)
             ? `Usia ${level.min_age} - ${level.max_age} Tahun`
             : (level.grade_range || 'Semua Usia');
@@ -984,33 +1038,18 @@ function renderClasses(classes, classImages = []) {
 
     container.innerHTML = classes.map((cls, index) => {
         const isPopular = index === 1 || classes.length === 1;
-        const levelBadge = cls.level_name ? cls.level_name.toUpperCase() : 'SEMUA LEVEL';
+        const levelBadge = cls.level_name ? `LEVEL ${cls.level_name.toUpperCase()}` : 'SEMUA LEVEL';
         const priceFormatted = Number(cls.price) === 0
             ? 'Gratis'
             : `Rp ${Number(cls.price).toLocaleString('id-ID')}`;
         const slots = parseScheduleSlots(cls.schedule_slots);
 
-        // Find associated class image: 1) cls.image_url from DB, 2) CMS media, 3) default
-        let classImgUrl = DEFAULT_CLASS_IMAGE;
-        if (cls.image_url) {
-            classImgUrl = cls.image_url;
-        } else if (Array.isArray(classImages) && classImages.length > 0) {
-            const matched = classImages.find(img => {
-                if (!img) return false;
-                const meta = typeof img.metadata === 'string' ? parseJsonField(img.metadata, {}) : (img.metadata || {});
-                return (
-                    meta.class_id === cls.id ||
-                    meta.class_id === String(cls.id) ||
-                    (img.name && img.name.toLowerCase().includes(cls.name.toLowerCase()))
-                );
-            });
-            if (matched && matched.file_url) {
-                classImgUrl = matched.file_url;
-            } else if (classImages[0] && classImages[0].file_url) {
-                // Fallback to class image from history
-                classImgUrl = classImages[index % classImages.length].file_url || DEFAULT_CLASS_IMAGE;
-            }
-        }
+        // Find associated class hero image:
+        // 1) cls.image_url from DB
+        // 2) CMS media uploaded for this class
+        // 3) Fallback level-specific hero banner
+        const fallbackHero = getClassFallbackSvg(cls);
+        const classImgUrl = getClassHeroImage(cls, classImages);
 
         const slotsHtml = slots.length > 0
             ? slots.map(s => `
@@ -1031,7 +1070,7 @@ function renderClasses(classes, classImages = []) {
                         width: 400,
                         height: 220,
                         sizes: '(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 400px',
-                        fallback: DEFAULT_CLASS_IMAGE
+                        fallback: fallbackHero
                     })}>
                 </div>
                 <div class="class-level-tag">${levelBadge}</div>
@@ -1048,7 +1087,7 @@ function renderClasses(classes, classImages = []) {
                     <div class="schedule-title">📅 Pilihan Jadwal Belajar:</div>
                     ${slotsHtml}
                 </div>
-                <a href="daftar.html?class=${encodeURIComponent(cls.id)}" class="btn-class ${isPopular ? 'btn-popular' : ''}">
+                <a href="daftar.html?class=${encodeURIComponent(cls.id)}&level=${encodeURIComponent(cls.level_id || '')}" class="btn-class ${isPopular ? 'btn-popular' : ''}">
                     Pilih Kelas Ini →
                 </a>
             </div>
