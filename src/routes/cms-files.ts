@@ -57,7 +57,12 @@ cmsFiles.post('/upload', adminAuthMiddleware, async (c) => {
 
         let originalName = '';
         if (contentType.includes('multipart/form-data')) {
-            const body = await c.req.parseBody();
+            let body: Record<string, any>;
+            try {
+                body = await c.req.parseBody() as Record<string, any>;
+            } catch (parseErr: any) {
+                return c.json({ error: 'Failed to parse multipart body', message: parseErr?.message || String(parseErr) }, 400);
+            }
             const uploadedFile = body.file as File | undefined;
 
             if (typeof body.name === 'string' && body.name.trim()) {
@@ -92,7 +97,12 @@ cmsFiles.post('/upload', adminAuthMiddleware, async (c) => {
                 fileSize = uploadedFile.size;
                 mimeType = uploadedFile.type || 'application/octet-stream';
 
-                const arrayBuffer = await uploadedFile.arrayBuffer();
+                let arrayBuffer: ArrayBuffer;
+                try {
+                    arrayBuffer = await uploadedFile.arrayBuffer();
+                } catch (abErr: any) {
+                    return c.json({ error: 'Failed to read file buffer', message: abErr?.message || String(abErr) }, 400);
+                }
 
                 if (c.env.R2) {
                     const cleanName = uploadedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -177,8 +187,10 @@ cmsFiles.post('/upload', adminAuthMiddleware, async (c) => {
             file: createdFile
         }, 201);
     } catch (error: any) {
-        console.error('File upload error:', error);
-        return c.json({ error: 'Failed to upload file', message: error.message }, 500);
+        const msg = error?.message || String(error);
+        const stack = error?.stack || '';
+        console.error('File upload error: ' + msg + (stack ? ' | ' + stack.split('\n')[0] : ''));
+        return c.json({ error: 'Failed to upload file', message: msg }, 500);
     }
 });
 

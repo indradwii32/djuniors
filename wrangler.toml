@@ -20,7 +20,7 @@
 
 name = "djuniors-api"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-03-01"
 account_id = "d8ec2416780269a92e97345394f74945"
 
 # Worker CPU limit — not supported on free plan; remove if deploying to free tier.
@@ -44,6 +44,7 @@ database_id = "085dd28b-dc9f-417b-adce-e48183d6fb47" # → `wrangler d1 create d
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "djuniors-files"
+preview_bucket_name = "djuniors-files"
 
 # ============================================
 # KV Namespace (sessions + cache version stamps)
@@ -107,6 +108,7 @@ id = "d6f364143c6543f5bc6c5d9e776c73f2"
 [[env.production.r2_buckets]]
 binding = "R2"
 bucket_name = "djuniors-files"
+preview_bucket_name = "djuniors-files"
 
 [env.staging]
 vars = { ENVIRONMENT = "staging", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "" }
