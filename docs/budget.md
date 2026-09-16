@@ -31,7 +31,7 @@ X-Response-Time-Ms: 24
 
 Cepat menemukan endpoint yang membakar budget:
 ```bash
-curl -sD - -o /dev/null https://api.djuniors.id/api/xyz | grep X-D1
+curl -sD - -o /dev/null https://api.djuniorslc.com/api/xyz | grep X-D1
 ```
 
 ### 2. Agregat harian (endpoint + widget)

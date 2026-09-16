@@ -219,16 +219,16 @@ curl -si -X POST \
 
 | Domain | Target | Cara |
 |--------|--------|------|
-| `djuniors.id` | Landing | CF Dashboard → Pages → djuniors-pages → Custom domains |
-| `admin.djuniors.id` | Dashboard | CF Dashboard → Pages → djuniors-admin → Custom domains |
-| `api.djuniors.id` | API | `npx wrangler route create api.djuniors.id/*` |
+| `djuniorslc.com` | Landing | CF Dashboard → Pages → djuniors-pages → Custom domains |
+| `admin.djuniorslc.com` | Dashboard | CF Dashboard → Pages → djuniors-admin → Custom domains |
+| `api.djuniorslc.com` | API | `npx wrangler route create api.djuniorslc.com/*` |
 
 Setelah custom domain aktif:
 
 1. Update CORS di `wrangler.toml`:
    ```toml
    [vars]
-   ALLOWED_ORIGINS = "https://djuniors.id,https://www.djuniors.id,https://admin.djuniors.id"
+   ALLOWED_ORIGINS = "https://djuniorslc.com,https://www.djuniorslc.com,https://admin.djuniorslc.com"
    ```
 
 2. Rebuild dashboard dengan API base production:

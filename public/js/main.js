@@ -144,7 +144,7 @@ const DEFAULT_CLASS_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/20
 //
 // `format: 'auto'` lets CF pick AVIF → WebP → JPEG → PNG automatically —
 // best LCP win per byte. `quality: 'auto'` likewise.
-const IMAGE_CDN_BASE = ''; // e.g. 'https://djuniors.id/cdn-cgi/image' in production — filled by deploy
+const IMAGE_CDN_BASE = ''; // e.g. 'https://djuniorslc.com/cdn-cgi/image' in production — filled by deploy
 
 /**
  * Returns a URL — CF-resized if CDN base is configured, otherwise the original.

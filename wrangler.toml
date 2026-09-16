@@ -70,7 +70,7 @@ JWT_SECRET = ""
 TURNSTILE_SECRET = ""           # legacy — use secret instead
 TURNSTILE_SITE_KEY = ""         # site-visible key, safe in vars
 # CORS allowlist. Uncomment in production and list every public origin:
-#   ALLOWED_ORIGINS = "https://djuniors.id,https://www.djuniors.id,https://admin.djuniors.id"
+#   ALLOWED_ORIGINS = "https://djuniorslc.com,https://www.djuniorslc.com,https://admin.djuniorslc.com"
 
 # Secrets (set via `wrangler secret put NAME`):
 #   - TURNSTILE_SECRET : Cloudflare Turnstile server-side secret

@@ -282,7 +282,7 @@ Terima kasih sudah mendaftar di Djuniors ({kota}).
 Siap belajar matematika jadi seru? 🚀
 
 📞 Hubungi kami jika ada pertanyaan!
-🌐 www.djuniors.id',
+🌐 www.djuniorslc.com',
         2
     ),
     (
@@ -378,7 +378,7 @@ Terima kasih sudah mendaftar di Djuniors ({kota}).
 Siap belajar matematika jadi seru? 🚀
 
 📞 Hubungi kami jika ada pertanyaan!
-🌐 www.djuniors.id',
+🌐 www.djuniorslc.com',
     version = 2
 WHERE id = 'welcome' AND (version < 2 OR version IS NULL);
 

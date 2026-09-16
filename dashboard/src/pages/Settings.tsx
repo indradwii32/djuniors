@@ -963,7 +963,7 @@ export const Settings: React.FC = () => {
                   required
                   value={newAccountNumber}
                   onChange={(e) => setNewAccountNumber(e.target.value)}
-                  placeholder="Contoh: 1234567890"
+                  placeholder="Contoh: 8881016052"
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', fontFamily: 'monospace', fontWeight: 700 }}
                 />
               </div>

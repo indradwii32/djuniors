@@ -22,8 +22,8 @@ Three Cloudflare products, all on the free tier:
 Endpoints after deploy:
 
 - **Landing:** `https://djuniors-pages.pages.dev/` (or custom domain)
-- **Dashboard:** `https://djuniors-admin.pages.dev/` (recommend `admin.djuniors.id`)
-- **API:** `https://djuniors-api.<account>.workers.dev/` (recommend `api.djuniors.id`)
+- **Dashboard:** `https://djuniors-admin.pages.dev/` (recommend `admin.djuniorslc.com`)
+- **API:** `https://djuniors-api.<account>.workers.dev/` (recommend `api.djuniorslc.com`)
 
 ---
 
@@ -132,27 +132,27 @@ npm run pages:deploy:admin     # Dashboard only
 Once everything is deployed on the `*.pages.dev` and `*.workers.dev` defaults,
 you can attach custom domains for production polish:
 
-### Landing page (djuniors.id)
+### Landing page (djuniorslc.com)
 
 1. Cloudflare Dashboard → **Pages** → `djuniors-pages` → **Custom domains**
-2. Add `djuniors.id` (and `www.djuniors.id` if you want)
+2. Add `djuniorslc.com` (and `www.djuniorslc.com` if you want)
 3. Update nameservers at your registrar to point to Cloudflare (if not already)
 
-### Dashboard (admin.djuniors.id)
+### Dashboard (admin.djuniorslc.com)
 
 Same process on the `djuniors-admin` Pages project.
 
-### API (api.djuniors.id)
+### API (api.djuniorslc.com)
 
 ```bash
-wrangler route create api.djuniors.id/*
+wrangler route create api.djuniorslc.com/*
 ```
 
 Then set `routes` in `wrangler.toml`:
 
 ```toml
 routes = [
-  { pattern = "api.djuniors.id/*", custom_domain = true }
+  { pattern = "api.djuniorslc.com/*", custom_domain = true }
 ]
 ```
 
@@ -166,9 +166,9 @@ Before going live, change to an allowlist:
 ```ts
 app.use('*', cors({
     origin: [
-        'https://djuniors.id',
-        'https://www.djuniors.id',
-        'https://admin.djuniors.id',
+        'https://djuniorslc.com',
+        'https://www.djuniorslc.com',
+        'https://admin.djuniorslc.com',
         // Local dev (don't ship these to production!)
         'http://localhost:8080',
         'http://localhost:5173',
@@ -271,27 +271,27 @@ Quick smoke tests from a remote shell:
 
 ```bash
 # Cache verification (Task C)
-curl -si https://api.djuniors.id/api/classes | grep -iE 'x-cache|cache-control'
+curl -si https://api.djuniorslc.com/api/classes | grep -iE 'x-cache|cache-control'
 # Expect: x-cache: HIT, Cache-Control: public, max-age=300
 
 # KV verification (Task D)
-curl -si https://api.djuniors.id/api/cms/public/all | grep -i x-cms-cache
+curl -si https://api.djuniorslc.com/api/cms/public/all | grep -i x-cms-cache
 # Expect: X-Cms-Cache: KV-HIT (after first warm-up call)
 
 # Fonts (Task G) — should never hit fonts.googleapis.com
-curl -s https://djuniors.id/ | grep -c "fonts.googleapis"
+curl -s https://djuniorslc.com/ | grep -c "fonts.googleapis"
 # Expect: 0
 
 # Code split (Task B) — should serve multiple JS chunks
-curl -s https://admin.djuniors.id/login | grep -c '<script'
+curl -s https://admin.djuniorslc.com/login | grep -c '<script'
 # Expect: ≥ 2
 
 # Budget monitoring — usage endpoint (needs admin token)
-curl -si -H "Authorization: Bearer $TOKEN" https://api.djuniors.id/api/admin/usage | head -30
+curl -si -H "Authorization: Bearer $TOKEN" https://api.djuniorslc.com/api/admin/usage | head -30
 # Expect: JSON with budgetPercent, and X-Budget-Warning header only when ≥80%
 
 # Dashboard snapshots — backfill right after deploy
-curl -si -X POST -H "Authorization: Bearer $TOKEN" https://api.djuniors.id/api/dashboard/snapshots/generate
+curl -si -X POST -H "Authorization: Bearer $TOKEN" https://api.djuniorslc.com/api/dashboard/snapshots/generate
 # Expect: {"success":true,"months_written":6,...}
 ```
 

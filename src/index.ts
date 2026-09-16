@@ -66,7 +66,7 @@ app.use('*', async (c, next) => {
 // Middleware
 // CORS: wildcard in dev, allowlist in production. Override with the
 // `ALLOWED_ORIGINS` env var (comma-separated), e.g.:
-//   ALLOWED_ORIGINS="https://djuniors.id,https://admin.djuniors.id"
+//   ALLOWED_ORIGINS="https://djuniorslc.com,https://admin.djuniorslc.com"
 const allowedOrigins = (env: Bindings): string | string[] => {
     const fromEnv = (env as any).ALLOWED_ORIGINS as string | undefined;
     if (fromEnv && fromEnv.trim() !== '') {
