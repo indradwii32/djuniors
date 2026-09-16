@@ -224,7 +224,7 @@ class DjuniorsTracking {
 
         // Generate WA message link
         const waMsg = `Halo Admin Djuniors! Saya ingin menanyakan status pendaftaran No: *${reg.registration_number}* atas nama *${reg.parent_name}*. Terima kasih!`;
-        const waLink = `https://wa.me/6281234567890?text=${encodeURIComponent(waMsg)}`;
+        const waLink = `https://wa.me/6287714977001?text=${encodeURIComponent(waMsg)}`;
 
         container.innerHTML = `
             <!-- Result Header -->
@@ -436,19 +436,35 @@ class DjuniorsTracking {
                 <div style="margin-bottom: 1.25rem;">
                     <div class="bank-account-card">
                         <div>
-                            <div class="bank-info-name">Bank BCA</div>
-                            <div class="bank-info-number">1234567890</div>
-                            <div class="bank-info-holder">a.n. PT Djuniors Indonesia</div>
+                            <div class="bank-info-name">BCA Syariah</div>
+                            <div class="bank-info-number">8881016052</div>
+                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
                         </div>
-                        <button type="button" class="btn-copy" data-copy="1234567890">Salin No. Rekening</button>
+                        <button type="button" class="btn-copy" data-copy="8881016052">Salin No. Rekening</button>
                     </div>
                     <div class="bank-account-card">
                         <div>
                             <div class="bank-info-name">Bank Mandiri</div>
-                            <div class="bank-info-number">123456789012345</div>
-                            <div class="bank-info-holder">a.n. PT Djuniors Indonesia</div>
+                            <div class="bank-info-number">1830000895994</div>
+                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
                         </div>
-                        <button type="button" class="btn-copy" data-copy="123456789012345">Salin No. Rekening</button>
+                        <button type="button" class="btn-copy" data-copy="1830000895994">Salin No. Rekening</button>
+                    </div>
+                    <div class="bank-account-card">
+                        <div>
+                            <div class="bank-info-name">Bank BRI</div>
+                            <div class="bank-info-number">105501017176507</div>
+                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
+                        </div>
+                        <button type="button" class="btn-copy" data-copy="105501017176507">Salin No. Rekening</button>
+                    </div>
+                    <div class="bank-account-card">
+                        <div>
+                            <div class="bank-info-name">DANA Wallet</div>
+                            <div class="bank-info-number">081252218206</div>
+                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
+                        </div>
+                        <button type="button" class="btn-copy" data-copy="081252218206">Salin No. Rekening/DANA</button>
                     </div>
                 </div>
 

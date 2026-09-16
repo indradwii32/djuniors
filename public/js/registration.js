@@ -744,9 +744,9 @@ class DjuniorsRegistration {
             const className = data.registration?.class_name || this.selectedClass?.name || '';
             const childrenNames = this.children.map(c => c.name).join(', ');
             
-            const message = `Halo Admin Djuniors! 👋\nSaya telah mendaftar dengan rincian:\n- No. Registrasi: *${regNumber}*\n- Nama Wali: *${parentName}*\n- Kelas: *${className}*\n- Nama Anak: *${childrenNames}*\n- Total: *Rp ${finalAmount.toLocaleString('id-ID')}*\n\nMohon informasi selanjutnya untuk kelas live Google Meet. Terima kasih!`;
-            
-            waBtn.href = `https://wa.me/6281234567890?text=${encodeURIComponent(message)}`;
+            const message = `Halo Admin Djuniors! 👋\nSaya telah mendaftar dengan rincian:\n- No. Registrasi: *${regNumber}*\n- Nama Wali: *${parentName}*\n- Kelas: *${className}*\n- Nama Anak: *${childrenNames}*\n- Total: *Rp ${finalAmount.toLocaleString('id-ID')}*\n\nMohon informasi selanjutnya untuk kelas online via Gmeet / Zoom. Terima kasih!`;
+
+            waBtn.href = `https://wa.me/6287714977001?text=${encodeURIComponent(message)}`;
         }
 
         modal.classList.remove('hidden');

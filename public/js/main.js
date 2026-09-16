@@ -10,8 +10,8 @@ const API_BASE = window.API_BASE || (window.location.origin && window.location.o
 
 const DEFAULT_FALLBACK_CMS = {
     header: {
-        site_name: 'Djuniors Learning Center',
-        logo_text: 'Djuniors',
+        site_name: 'D’Juniors Learning Center',
+        logo_text: 'D’Juniors',
         nav_items: [
             { label: 'Fitur', href: '#features' },
             { label: 'Pilihan Kelas', href: '#classes' },
@@ -23,11 +23,11 @@ const DEFAULT_FALLBACK_CMS = {
         cta_button_text: 'Daftar Sekarang'
     },
     footer: {
-        footer_tagline: 'Belajar matematika jadi seru untuk anak Indonesia!',
-        footer_email: 'hello@djuniors.id',
-        footer_phone: '081234567890',
-        footer_address: 'Jakarta, Indonesia',
-        copyright: '2026 Djuniors Learning Center',
+        footer_tagline: 'Lembaga pembelajaran online yang membantu anak belajar Matematika dengan cara menyenangkan & interaktif via Gmeet/Zoom.',
+        footer_email: 'admin@djuniorslc.com',
+        footer_phone: '0877 1497 7001',
+        footer_address: 'Perum Bringin Indah Persada C 9 Tulungrejo, Pare, Kediri, Jawa Timur',
+        copyright: '2026 D’Juniors Learning Center',
         // Used when the CMS fetch fails (offline deploy, network error, etc).
         // Each entry: { platform, label, url, icon, order }. Empty url = hidden.
         social_links: [
@@ -35,79 +35,79 @@ const DEFAULT_FALLBACK_CMS = {
             { platform: 'instagram', label: 'Instagram Djuniors', url: 'https://instagram.com/djuniors',   icon: '📸', order: 2 },
             { platform: 'tiktok',    label: 'TikTok Djuniors',    url: 'https://tiktok.com/@djuniors',      icon: '🎵', order: 3 },
             { platform: 'youtube',   label: 'YouTube Djuniors',   url: 'https://youtube.com/@djuniors',     icon: '📺', order: 4 },
-            { platform: 'whatsapp',  label: 'WhatsApp Djuniors',  url: 'https://wa.me/6281234567890',       icon: '💬', order: 5 },
+            { platform: 'whatsapp',  label: 'WhatsApp Djuniors',  url: 'https://wa.me/6287714977001',       icon: '💬', order: 5 },
         ]
     },
     hero: {
         hero_badge: '🎯',
-        hero_title: 'Kelas Matematika\nLive Interaktif untuk Anak!',
-        hero_subtitle: 'Belajar matematika langsung dengan guru via Google Meet.\nInteraktif, seru, dan menyenangkan untuk anak usia TK & SD! 🎮',
-        hero_cta_text: '🚀 Daftar Kelas Gratis!',
+        hero_title: 'Kelas Matematika Online\nInteraktif & Menyenangkan!',
+        hero_subtitle: 'Belajar matematika langsung dengan guru via Google Meet / Zoom.\nMembangun pemahaman konsep, logika berpikir, dan percaya diri untuk TK, SD, hingga SMP! 🎮',
+        hero_cta_text: '🚀 Daftar Kelas Sekarang!',
         hero_cta_link: 'daftar.html'
     },
     features: {
-        features_title: 'Kenapa Pilih Djuniors?',
-        features_subtitle: 'Kelas live interaktif yang bikin anak ketagihan belajar!',
+        features_title: 'Kenapa Pilih D’Juniors Learning Center?',
+        features_subtitle: 'Pembelajaran online interaktif yang bikin anak paham konsep & makin percaya diri!',
         features_items: [
             {
                 icon: '👩‍🏫',
                 title: 'Live Class dengan Guru',
-                description: 'Belajar langsung dengan guru berpengalaman via Google Meet. Bukan sekadar nonton video!'
+                description: 'Belajar langsung dengan guru via Google Meet & Zoom. Bukan sekadar menonton video!'
             },
             {
                 icon: '🤝',
-                title: 'Interaktif & Real-Time',
-                description: 'Anak bisa bertanya, berdiskusi, dan bermain game langsung di kelas. Belajar jadi menyenangkan!'
+                title: 'Interaktif & Menyenangkan',
+                description: 'Anak aktif berdiskusi dan berlatih konsep secara menyenangkan agar tidak cepat bosan.'
             },
             {
                 icon: '👨‍👩‍👧',
-                title: 'Kelas Kecil (Maks 8 Siswa)',
-                description: 'Kelas kecil agar setiap anak mendapat perhatian penuh dari guru. Kualitas belajar terjamin!'
+                title: 'Reguler (8-12) & Private (1-on-1)',
+                description: 'Pilihan kelas kelompok suportif maupun 1-on-1 intensif sesuai kebutuhan belajar anak.'
             },
             {
                 icon: '📱',
-                title: 'Akses dari Mana Saja',
-                description: 'Cukup HP atau laptop dengan internet. Anak bisa belajar dari rumah tanpa ribet!'
+                title: 'Fleksibel dari Mana Saja',
+                description: 'Cukup laptop atau smartphone dengan koneksi internet. Belajar nyaman langsung dari rumah!'
             }
         ]
     },
     classes: {
         classes_title: 'Pilihan Kelas & Jadwal',
-        classes_subtitle: 'Pilih kelas yang sesuai dengan usia dan jadwal belajar anak Anda!'
+        classes_subtitle: 'Pilih program Reguler (Rp97.000/bln) atau Private (Rp398.000/bln) sesuai jenjang anak!'
     },
     testimonials: {
         testimonials_title: 'Kata Orang Tua',
-        testimonials_subtitle: 'Mereka sudah membuktikan anak jadi semangat belajar!',
+        testimonials_subtitle: 'Mereka sudah membuktikan anak jadi semakin percaya diri & suka matematika!',
         testimonials_items: [
             {
                 name: 'Ibu Sarah',
-                relation: 'Ibu dari Rizky (7 tahun)',
-                text: 'Anak saya yang tadinya tidak suka matematika, sekarang minta belajar setiap hari! Kelas live-nya seru banget, guru-nya juga sabar.',
+                relation: 'Ibu dari Rizky (SD Kelas 2)',
+                text: 'Anak saya yang tadinya takut matematika, sekarang sangat antusias belajar! Penjelasan konsepnya jelas dan gurunya ramah.',
                 rating: 5
             },
             {
                 name: 'Bapak Ahmad',
-                relation: 'Ayah dari Siti (5 tahun)',
-                text: 'Kelas kecil jadi anak saya lebih percaya diri bertanya. Guru-gurunya juga selalu kasih feedback setelah kelas. Recommended banget!',
+                relation: 'Ayah dari Siti (TK B)',
+                text: 'Kelas interaktif membuat anak saya aktif merespons. Fondasi angka dan logikanya terbentuk sangat baik.',
                 rating: 5
             },
             {
                 name: 'Ibu Dewi',
-                relation: 'Ibu dari Budi (9 tahun)',
-                text: 'Praktis banget! Gak perlu antar-jemput. Anak belajar dari rumah lewat Google Meet, tapi tetap interaktif. Nilai matematikanya naik!',
+                relation: 'Ibu dari Budi (SMP Kelas 7)',
+                text: 'Program Progress SMP sangat membantu memperdalam konsep matematika dan nilai sekolah anak saya meningkat drastis!',
                 rating: 5
             }
         ]
     },
     cta: {
-        cta_title: 'Siap Belajar Live? 🚀',
-        cta_subtitle: 'Daftar sekarang dan dapatkan 1 kelas gratis via Google Meet!',
-        cta_button_text: 'Daftar Gratis Sekarang!'
+        cta_title: 'Siap Belajar Online Bersama D’Juniors? 🚀',
+        cta_subtitle: 'Daftar sekarang dan bergabunglah dengan kelas interaktif via Google Meet / Zoom!',
+        cta_button_text: 'Daftar Sekarang!'
     },
     meta: {
-        meta_title: 'Djuniors - Kelas Matematika Live Interaktif untuk Anak! 🧮',
-        meta_description: 'Kelas online matematika live interaktif untuk anak TK & SD via Google Meet. Belajar langsung dengan guru!',
-        meta_keywords: 'matematika anak, kelas online live, Google Meet, TK, SD, math for kids, belajar interaktif'
+        meta_title: 'D’Juniors Learning Center - Kelas Matematika Interaktif untuk TK, SD & SMP 🧮',
+        meta_description: 'Lembaga pembelajaran online matematika interaktif untuk TK, SD, hingga SMP via Google Meet & Zoom. Belajar menyenangkan & berkonsep!',
+        meta_keywords: 'matematika anak, kelas online live, Google Meet, Zoom, TK, SD, SMP, math for kids, belajar interaktif, djuniors'
     },
     style: {
         primary_color: '#4A90D9',

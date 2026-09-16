@@ -18,72 +18,74 @@ VALUES (
 -- Default bank accounts for manual transfer
 INSERT OR REPLACE INTO bank_accounts (id, bank_name, account_number, account_name, is_active)
 VALUES 
-    ('bank-001', 'BCA', '1234567890', 'PT Djuniors Indonesia', 1),
-    ('bank-002', 'Mandiri', '123456789012345', 'PT Djuniors Indonesia', 1);
+    ('bank-001', 'BCA Syariah', '8881016052', 'Wahyu Adi Syahputra', 1),
+    ('bank-002', 'Bank Mandiri', '183 0000 895994', 'Wahyu Adi Syahputra', 1),
+    ('bank-003', 'Bank BRI', '1055 0101 7176 507', 'Wahyu Adi Syahputra', 1),
+    ('bank-004', 'DANA Wallet', '081252218206', 'Wahyu Adi Syahputra', 1);
 
 -- Default settings
 INSERT OR REPLACE INTO settings (key, value)
 VALUES 
-    ('site_name', 'Djuniors Learning Center'),
-    ('site_description', 'Belajar matematika jadi seru untuk anak TK & SD!'),
-    ('contact_email', 'hello@djuniors.id'),
-    ('contact_phone', '081234567890');
+    ('site_name', 'D’Juniors Learning Center'),
+    ('site_description', 'Lembaga pembelajaran online yang membantu anak belajar Matematika dengan cara yang menyenangkan, interaktif, dan sesuai dengan kemampuan masing-masing anak.'),
+    ('contact_email', 'admin@djuniorslc.com'),
+    ('contact_phone', '087714977001');
 
 -- Default Levels
 INSERT OR REPLACE INTO levels (id, name, description, min_age, max_age, grade_range, is_active, sort_order)
 VALUES 
-    ('level-tk', 'TK', 'Program pengenalan matematika dasar & logika ceria untuk anak usia TK', 4, 6, 'TK A - TK B', 1, 1),
-    ('level-sd-dasar', 'SD Dasar', 'Fondasi berhitung, konsep angka, dan logika dasar untuk kelas 1-2 SD', 7, 8, 'Kelas 1-2 SD', 1, 2),
-    ('level-sd-menengah', 'SD Menengah', 'Pengembangan pemecahan masalah dan konsep matematika lanjutan untuk kelas 3-4 SD', 9, 10, 'Kelas 3-4 SD', 1, 3);
+    ('level-foundation', 'Foundation', 'Untuk anak usia TK hingga SD kelas 2-3 yang sedang membangun dasar-dasar Matematika.', 4, 9, 'TK - SD Kelas 2-3', 1, 1),
+    ('level-development', 'Development', 'Untuk siswa SD kelas 4–6 yang siap mengembangkan kemampuan Matematika dan berpikir logis ke tingkat yang lebih lanjut.', 9, 12, 'SD Kelas 4–6', 1, 2),
+    ('level-progress', 'Progress', 'Program Matematika untuk siswa SMP yang dirancang untuk membantu siswa memahami materi secara lebih mendalam, meningkatkan kemampuan berpikir logis, serta membangun kepercayaan diri dalam menghadapi berbagai tantangan Matematika.', 12, 15, 'SMP', 1, 3);
 
 -- Default Classes (with embedded schedule_slots)
 INSERT OR REPLACE INTO classes (id, name, description, level_id, price, max_students, schedule_slots, icon, image_url, is_active)
 VALUES 
     (
-        'cls-tk-01',
-        'Kelas Matematika TK',
-        'Program interaktif pengenalan angka, bentuk geometri ceria, dan logika dasar untuk anak usia TK (4-6 tahun).',
-        'level-tk',
-        149000,
-        6,
-        '[{"day":"Senin","start":"15:00","end":"16:00","start_time":"15:00","end_time":"16:00"},{"day":"Rabu","start":"15:00","end":"16:00","start_time":"15:00","end_time":"16:00"}]',
+        'cls-reg-01',
+        'Kelas Reguler (TK - SD Kelas 2-3)',
+        'Kelas Foundation Matematika online berkelompok (8-12 siswa), 8x pertemuan/bulan @60 menit via Google Meet / Zoom.',
+        'level-foundation',
+        97000,
+        12,
+        '[{"day":"Senin & Rabu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Senin & Rabu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Selasa & Kamis","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Selasa & Kamis","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Jumat & Sabtu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Jumat & Sabtu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"}]',
         '🧮',
         NULL,
         1
     ),
     (
-        'cls-sd-01',
-        'Kelas Berhitung SD',
-        'Fondasi berhitung cepat, nilai tempat, operasi hitung dasar, dan pemecahan soal cerita untuk siswa kelas 1-2 SD.',
-        'level-sd-dasar',
-        179000,
-        8,
-        '[{"day":"Selasa","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Kamis","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"}]',
+        'cls-reg-02',
+        'Kelas Reguler (SD Kelas 4-6)',
+        'Kelas Development Matematika online berkelompok (8-12 siswa), 8x pertemuan/bulan @60 menit via Google Meet / Zoom.',
+        'level-development',
+        97000,
+        12,
+        '[{"day":"Senin & Rabu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Senin & Rabu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Selasa & Kamis","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Selasa & Kamis","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Jumat & Sabtu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Jumat & Sabtu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"}]',
         '🎒',
         NULL,
         1
     ),
     (
-        'cls-sd-02',
-        'Kelas Logika SD',
-        'Pengembangan penalaran kritis, problem solving tingkat lanjut, dan eksplorasi matematika kreatif untuk kelas 3-4 SD.',
-        'level-sd-menengah',
-        199000,
-        8,
-        '[{"day":"Jumat","start":"16:00","end":"17:30","start_time":"16:00","end_time":"17:30"},{"day":"Sabtu","start":"09:30","end":"11:00","start_time":"09:30","end_time":"11:00"}]',
+        'cls-reg-03',
+        'Kelas Reguler (SMP)',
+        'Kelas Progress Matematika online berkelompok (8-12 siswa), 8x pertemuan/bulan @60 menit via Google Meet / Zoom.',
+        'level-progress',
+        97000,
+        12,
+        '[{"day":"Senin & Rabu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Senin & Rabu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Selasa & Kamis","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Selasa & Kamis","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"},{"day":"Jumat & Sabtu","start":"16:00","end":"17:00","start_time":"16:00","end_time":"17:00"},{"day":"Jumat & Sabtu","start":"18:30","end":"19:30","start_time":"18:30","end_time":"19:30"}]',
         '🚀',
         NULL,
         1
     ),
     (
-        'cls-sd-03',
-        'Kelas Olimpiade Math',
-        'Pelatihan intensif persiapan kompetisi matematika, strategi berpikir tingkat tinggi, dan pemecahan soal HOTS.',
-        'level-sd-menengah',
-        249000,
-        6,
-        '[{"day":"Sabtu","start":"13:00","end":"15:00","start_time":"13:00","end_time":"15:00"}]',
-        '🏆',
+        'cls-prv-01',
+        'Kelas Private (TK / SD / SMP)',
+        'Pembelajaran 1-on-1 intensif dan personal via Google Meet / Zoom (8x pertemuan/bulan @60 menit). Jadwal fleksibel sesuai permintaan dan materi disesuaikan kebutuhan siswa.',
+        'level-foundation',
+        398000,
+        1,
+        '[{"day":"Private (Jadwal Fleksibel)","start":"Fleksibel","end":"Sesuai Permintaan","start_time":"Fleksibel","end_time":"Sesuai Permintaan"}]',
+        '⭐',
         NULL,
         1
     );
@@ -101,13 +103,13 @@ VALUES
         'Ibu Rina',
         '081234567890',
         'rina@example.com',
-        'Jakarta',
-        'cls-sd-01',
-        'Selasa (16:00 - 17:00 WIB)',
+        'Kediri',
+        'cls-reg-01',
+        'Senin & Rabu (16:00 - 17:00 WIB)',
         '[{"name":"Dina","age_or_class":"7 tahun"}]',
-        179000,
+        97000,
         0,
-        179000,
+        97000,
         NULL,
         'bank_transfer',
         '/uploads/proof-reg-001.jpg',
@@ -122,9 +124,9 @@ VALUES
         '085678901234',
         'andi@example.com',
         'Surabaya',
-        'cls-sd-02',
-        'Jumat (16:00 - 17:30 WIB)',
-        '[{"name":"Raka","age_or_class":"9 tahun"},{"name":"Rani","age_or_class":"8 tahun"}]',
+        'cls-prv-01',
+        'Private (Jadwal Fleksibel)',
+        '[{"name":"Raka","age_or_class":"9 tahun"}]',
         398000,
         0,
         398000,
@@ -141,13 +143,13 @@ VALUES
         'Ibu Sari',
         '089876543210',
         'sari@example.com',
-        'Bandung',
-        'cls-tk-01',
-        'Senin (15:00 - 16:00 WIB)',
-        '[{"name":"Arka","age_or_class":"5 tahun"}]',
-        149000,
+        'Malang',
+        'cls-reg-02',
+        'Selasa & Kamis (16:00 - 17:00 WIB)',
+        '[{"name":"Arka","age_or_class":"10 tahun"}]',
+        97000,
         0,
-        149000,
+        97000,
         NULL,
         'bank_transfer',
         '/uploads/proof-reg-003.jpg',
@@ -166,7 +168,7 @@ VALUES
         'reg-001',
         'REG-001',
         '081234567890',
-        179000,
+        97000,
         'bank_transfer',
         '/uploads/proof-reg-001.jpg',
         'confirmed',
@@ -192,7 +194,7 @@ VALUES
         'reg-003',
         'REG-003',
         '089876543210',
-        149000,
+        97000,
         'bank_transfer',
         '/uploads/proof-reg-003.jpg',
         'confirmed',
@@ -211,38 +213,38 @@ VALUES
 INSERT OR REPLACE INTO cms_content (id, section, key, value, type)
 VALUES
     -- Header
-    ('cms-hdr-01', 'header', 'site_name', 'Djuniors Learning Center', 'text'),
-    ('cms-hdr-02', 'header', 'logo_text', 'Djuniors Learning Center', 'text'),
+    ('cms-hdr-01', 'header', 'site_name', 'D’Juniors Learning Center', 'text'),
+    ('cms-hdr-02', 'header', 'logo_text', 'D’Juniors Learning Center', 'text'),
     ('cms-hdr-03', 'header', 'nav_items', '[{"label":"Fitur","href":"#features"},{"label":"Pilihan Kelas","href":"#classes"},{"label":"Cara Kerja","href":"#how-it-works"},{"label":"Testimoni","href":"#testimonials"},{"label":"FAQ","href":"#faq"},{"label":"Lacak Pendaftaran","href":"lacak.html"}]', 'json'),
     ('cms-hdr-04', 'header', 'cta_button_text', 'Daftar Sekarang', 'text'),
 
     -- Footer
-    ('cms-ftr-01', 'footer', 'footer_tagline', 'Belajar matematika jadi seru untuk anak Indonesia!', 'text'),
-    ('cms-ftr-02', 'footer', 'footer_email', 'hello@djuniors.id', 'text'),
-    ('cms-ftr-03', 'footer', 'footer_phone', '081234567890', 'text'),
-    ('cms-ftr-04', 'footer', 'footer_address', 'Jakarta, Indonesia', 'text'),
-    ('cms-ftr-05', 'footer', 'copyright', '2026 Djuniors Learning Center', 'text'),
+    ('cms-ftr-01', 'footer', 'footer_tagline', 'Lembaga pembelajaran online yang membantu anak belajar Matematika dengan cara yang menyenangkan, interaktif, dan sesuai kemampuan masing-masing anak.', 'text'),
+    ('cms-ftr-02', 'footer', 'footer_email', 'admin@djuniorslc.com', 'text'),
+    ('cms-ftr-03', 'footer', 'footer_phone', '0877 1497 7001', 'text'),
+    ('cms-ftr-04', 'footer', 'footer_address', 'Perum Bringin Indah Persada C 9 Tulungrejo, Pare, Kediri, Jawa Timur', 'text'),
+    ('cms-ftr-05', 'footer', 'copyright', '2026 D’Juniors Learning Center', 'text'),
     -- Social links: each entry has {platform, label, url, icon} (icon is an emoji or short text).
     -- Empty `url` means the platform is hidden from the footer until admin fills it in.
     ('cms-ftr-06', 'footer', 'social_links',
-        '[{"platform":"facebook","label":"Facebook Djuniors","url":"https://facebook.com/djuniors","icon":"📘","order":1},{"platform":"instagram","label":"Instagram Djuniors","url":"https://instagram.com/djuniors","icon":"📸","order":2},{"platform":"tiktok","label":"TikTok Djuniors","url":"https://tiktok.com/@djuniors","icon":"🎵","order":3},{"platform":"youtube","label":"YouTube Djuniors","url":"https://youtube.com/@djuniors","icon":"📺","order":4},{"platform":"whatsapp","label":"WhatsApp Djuniors","url":"https://wa.me/6281234567890","icon":"💬","order":5},{"platform":"telegram","label":"Telegram Djuniors","url":"","icon":"✈️","order":6}]',
+        '[{"platform":"facebook","label":"Facebook Djuniors","url":"https://facebook.com/djuniors","icon":"📘","order":1},{"platform":"instagram","label":"Instagram Djuniors","url":"https://instagram.com/djuniors","icon":"📸","order":2},{"platform":"tiktok","label":"TikTok Djuniors","url":"https://tiktok.com/@djuniors","icon":"🎵","order":3},{"platform":"youtube","label":"YouTube Djuniors","url":"https://youtube.com/@djuniors","icon":"📺","order":4},{"platform":"whatsapp","label":"WhatsApp Djuniors","url":"https://wa.me/6287714977001","icon":"💬","order":5},{"platform":"telegram","label":"Telegram Djuniors","url":"","icon":"✈️","order":6}]',
         'json'),
 
     -- Hero
-    ('cms-hro-01', 'hero', 'hero_title', 'Kelas Matematika Live Interaktif untuk Anak!', 'text'),
-    ('cms-hro-02', 'hero', 'hero_subtitle', 'Belajar matematika langsung dengan guru via Google Meet.', 'text'),
-    ('cms-hro-03', 'hero', 'hero_cta_text', 'Daftar Kelas Gratis!', 'text'),
+    ('cms-hro-01', 'hero', 'hero_title', 'Kelas Matematika Online Interaktif & Menyenangkan!', 'text'),
+    ('cms-hro-02', 'hero', 'hero_subtitle', 'Membantu anak belajar Matematika dengan cara yang menyenangkan, interaktif, dan sesuai dengan kemampuan masing-masing anak via Google Meet / Zoom.', 'text'),
+    ('cms-hro-03', 'hero', 'hero_cta_text', 'Daftar Kelas Sekarang!', 'text'),
     ('cms-hro-04', 'hero', 'hero_cta_link', 'daftar.html', 'text'),
     ('cms-hro-05', 'hero', 'hero_badge', '🎯', 'text'),
 
     -- Features
-    ('cms-ft-01', 'features', 'features_title', 'Kenapa Pilih Djuniors Learning Center?', 'text'),
-    ('cms-ft-02', 'features', 'features_subtitle', 'Kelas live interaktif yang bikin anak ketagihan belajar!', 'text'),
-    ('cms-ft-03', 'features', 'features_items', '[{"icon":"👩‍🏫","title":"Live Class dengan Guru","description":"Belajar langsung dengan guru berpengalaman via Google Meet. Bukan sekadar nonton video!"},{"icon":"🤝","title":"Interaktif & Real-Time","description":"Anak bisa bertanya, berdiskusi, dan bermain game langsung di kelas. Belajar jadi menyenangkan!"},{"icon":"👨‍👩‍👧","title":"Kelas Kecil (Maks 8 Siswa)","description":"Kelas kecil agar setiap anak mendapat perhatian penuh dari guru. Kualitas belajar terjamin!"},{"icon":"📱","title":"Akses dari Mana Saja","description":"Cukup HP atau laptop dengan internet. Anak bisa belajar dari rumah tanpa ribet!"}]', 'json'),
+    ('cms-ft-01', 'features', 'features_title', 'Kenapa Pilih D’Juniors Learning Center?', 'text'),
+    ('cms-ft-02', 'features', 'features_subtitle', 'Membangun pemahaman konsep, logika berpikir, dan rasa percaya diri anak dalam Matematika!', 'text'),
+    ('cms-ft-03', 'features', 'features_items', '[{"icon":"👩‍🏫","title":"Live Class Interaktif","description":"Belajar langsung dengan guru berpengalaman via Gmeet/Zoom. Membangun konsep dan logika secara terarah!"},{"icon":"🤝","title":"Menyenangkan & Personal","description":"Pembelajaran disesuaikan dengan kemampuan masing-masing anak agar anak percaya diri dan aktif bertanya."},{"icon":"👨‍👩‍👧","title":"Kelas Reguler & Private","description":"Pilihan kelas kelompok kecil (8-12 siswa) atau 1-on-1 private dengan jadwal fleksibel sesuai kebutuhan."},{"icon":"📱","title":"Akses Fleksibel dari Rumah","description":"Cukup HP atau laptop dengan koneksi internet. Hemat waktu, nyaman, dan materi terekam dengan baik!"}]', 'json'),
 
     -- Classes Section
-    ('cms-cls-01', 'classes', 'classes_title', 'Pilihan Kelas & Jadwal', 'text'),
-    ('cms-cls-02', 'classes', 'classes_subtitle', 'Pilih kelas yang sesuai dengan usia dan jadwal belajar anak Anda!', 'text'),
+    ('cms-cls-01', 'classes', 'classes_title', 'Program & Pilihan Kelas', 'text'),
+    ('cms-cls-02', 'classes', 'classes_subtitle', 'Tersedia Kelas Reguler (Rp97.000/bln) dan Kelas Private (Rp398.000/bln) dengan pilihan jadwal lengkap!', 'text'),
 
     -- Testimonials
     ('cms-tst-01', 'testimonials', 'testimonials_title', 'Kata Orang Tua', 'text'),
@@ -250,14 +252,14 @@ VALUES
     ('cms-tst-03', 'testimonials', 'testimonials_items', '[{"name":"Ibu Sarah","relation":"Ibu dari Rizky (7 tahun)","text":"Anak saya yang tadinya tidak suka matematika, sekarang minta belajar setiap hari! Kelas live-nya seru banget, guru-nya juga sabar.","rating":5},{"name":"Bapak Ahmad","relation":"Ayah dari Siti (5 tahun)","text":"Kelas kecil jadi anak saya lebih percaya diri bertanya. Guru-gurunya juga selalu kasih feedback setelah kelas. Recommended banget!","rating":5},{"name":"Ibu Dewi","relation":"Ibu dari Budi (9 tahun)","text":"Praktis banget! Gak perlu antar-jemput. Anak belajar dari rumah lewat Google Meet, tapi tetap interaktif. Nilai matematikanya naik!","rating":5}]', 'json'),
 
     -- CTA
-    ('cms-cta-01', 'cta', 'cta_title', 'Siap Belajar Live?', 'text'),
-    ('cms-cta-02', 'cta', 'cta_subtitle', 'Daftar sekarang dan dapatkan 1 kelas gratis via Google Meet!', 'text'),
-    ('cms-cta-03', 'cta', 'cta_button_text', 'Daftar Gratis Sekarang!', 'text'),
+    ('cms-cta-01', 'cta', 'cta_title', 'Siap Belajar Live? 🚀', 'text'),
+    ('cms-cta-02', 'cta', 'cta_subtitle', 'Daftar sekarang dan bergabunglah dengan kelas interaktif via Google Meet / Zoom!', 'text'),
+    ('cms-cta-03', 'cta', 'cta_button_text', 'Daftar Sekarang!', 'text'),
 
     -- Meta
-    ('cms-met-01', 'meta', 'meta_title', 'Djuniors Learning Center - Kelas Matematika Live Interaktif untuk Anak!', 'text'),
-    ('cms-met-02', 'meta', 'meta_description', 'Djuniors Learning Center - Kelas online matematika live interaktif untuk anak TK & SD via Google Meet. Belajar langsung dengan guru!', 'text'),
-    ('cms-met-03', 'meta', 'meta_keywords', 'matematika anak, kelas online live, Google Meet, TK, SD, math for kids, belajar interaktif, djuniors, learning center', 'text'),
+    ('cms-met-01', 'meta', 'meta_title', 'D’Juniors Learning Center - Belajar Matematika Seru & Interaktif', 'text'),
+    ('cms-met-02', 'meta', 'meta_description', 'D’Juniors Learning Center - Lembaga pembelajaran online matematika interaktif untuk TK, SD, hingga SMP via Google Meet & Zoom.', 'text'),
+    ('cms-met-03', 'meta', 'meta_keywords', 'matematika anak, kelas online live, Google Meet, Zoom, TK, SD, SMP, math for kids, belajar interaktif, djuniors, learning center', 'text'),
 
     -- Style
     ('cms-stl-01', 'style', 'primary_color', '#4A90D9', 'color'),
@@ -269,16 +271,16 @@ VALUES
 -- CMS Settings Seed Data
 INSERT OR REPLACE INTO cms_settings (id, key, value, category)
 VALUES
-    ('set-001', 'site_name', 'Djuniors Learning Center', 'general'),
-    ('set-002', 'logo_text', 'Djuniors Learning Center', 'general'),
+    ('set-001', 'site_name', 'D’Juniors Learning Center', 'general'),
+    ('set-002', 'logo_text', 'D’Juniors Learning Center', 'general'),
     ('set-003', 'primary_color', '#0EA5E9', 'style'),
     ('set-004', 'secondary_color', '#FFD93D', 'style'),
     ('set-005', 'accent_color', '#FF6B35', 'style'),
     ('set-006', 'font_heading', 'Baloo 2', 'style'),
     ('set-007', 'font_body', 'Nunito', 'style'),
-    ('set-008', 'meta_title', 'Djuniors Learning Center - Kelas Matematika Live Interaktif untuk Anak!', 'seo'),
-    ('set-009', 'meta_description', 'Djuniors Learning Center - Kelas online matematika live interaktif untuk anak TK & SD via Google Meet. Belajar langsung dengan guru!', 'seo'),
-    ('set-010', 'meta_keywords', 'matematika anak, kelas online live, Google Meet, TK, SD', 'seo');
+    ('set-008', 'meta_title', 'D’Juniors Learning Center - Belajar Matematika Seru & Interaktif', 'seo'),
+    ('set-009', 'meta_description', 'D’Juniors Learning Center - Lembaga pembelajaran online matematika interaktif untuk TK, SD, hingga SMP via Google Meet & Zoom.', 'seo'),
+    ('set-010', 'meta_keywords', 'matematika anak, kelas online live, Google Meet, Zoom, TK, SD, SMP', 'seo');
 
 -- CMS Icons Seed Data (30 SVG Icons: Math, Kids, Education, Objects)
 INSERT OR REPLACE INTO cms_icons (id, name, svg_code, category, is_active)

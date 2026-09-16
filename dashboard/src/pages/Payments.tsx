@@ -32,16 +32,30 @@ import {
 const DEFAULT_BANKS: BankAccount[] = [
   {
     id: 'bank-001',
-    bank_name: 'BCA (Bank Central Asia)',
-    account_number: '1234567890',
-    account_name: 'PT Djuniors Indonesia',
+    bank_name: 'BCA Syariah',
+    account_number: '8881016052',
+    account_name: 'Wahyu Adi Syahputra',
     is_active: 1,
   },
   {
     id: 'bank-002',
     bank_name: 'Bank Mandiri',
-    account_number: '123456789012345',
-    account_name: 'PT Djuniors Indonesia',
+    account_number: '1830000895994',
+    account_name: 'Wahyu Adi Syahputra',
+    is_active: 1,
+  },
+  {
+    id: 'bank-003',
+    bank_name: 'Bank BRI',
+    account_number: '105501017176507',
+    account_name: 'Wahyu Adi Syahputra',
+    is_active: 1,
+  },
+  {
+    id: 'bank-004',
+    bank_name: 'DANA Wallet',
+    account_number: '081252218206',
+    account_name: 'Wahyu Adi Syahputra',
     is_active: 1,
   },
 ];

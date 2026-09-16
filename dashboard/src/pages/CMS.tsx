@@ -68,25 +68,25 @@ const DEFAULT_CMS: Record<string, Record<string, any>> = {
     cta_button_text: 'Daftar Sekarang',
   },
   footer: {
-    footer_tagline: 'Belajar matematika jadi seru untuk anak Indonesia!',
-    footer_email: 'hello@djuniors.id',
-    footer_phone: '081234567890',
-    footer_address: 'Jakarta, Indonesia',
-    copyright: '2026 Djuniors Learning Center',
+    footer_tagline: 'Lembaga pembelajaran online yang membantu anak belajar Matematika dengan cara menyenangkan & interaktif via Gmeet/Zoom.',
+    footer_email: 'admin@djuniorslc.com',
+    footer_phone: '0877 1497 7001',
+    footer_address: 'Perum Bringin Indah Persada C 9 Tulungrejo, Pare, Kediri, Jawa Timur',
+    copyright: '2026 D’Juniors Learning Center',
     social_links: [
       { platform: 'facebook',  label: 'Facebook Djuniors',  url: 'https://facebook.com/djuniors',  icon: '📘', order: 1 },
       { platform: 'instagram', label: 'Instagram Djuniors', url: 'https://instagram.com/djuniors', icon: '📸', order: 2 },
       { platform: 'tiktok',    label: 'TikTok Djuniors',    url: 'https://tiktok.com/@djuniors',    icon: '🎵', order: 3 },
       { platform: 'youtube',   label: 'YouTube Djuniors',   url: 'https://youtube.com/@djuniors',   icon: '📺', order: 4 },
-      { platform: 'whatsapp',  label: 'WhatsApp Djuniors',  url: 'https://wa.me/6281234567890',     icon: '💬', order: 5 },
+      { platform: 'whatsapp',  label: 'WhatsApp Djuniors',  url: 'https://wa.me/6287714977001',     icon: '💬', order: 5 },
       { platform: 'telegram',  label: 'Telegram Djuniors',  url: '',                                icon: '✈️', order: 6 },
     ],
   },
   hero: {
     hero_badge: '🎯',
-    hero_title: 'Kelas Matematika Live Interaktif untuk Anak!',
-    hero_subtitle: 'Belajar matematika langsung dengan guru via Google Meet.',
-    hero_cta_text: 'Daftar Kelas Gratis!',
+    hero_title: 'Kelas Matematika Online Interaktif & Menyenangkan!',
+    hero_subtitle: 'Belajar matematika langsung dengan guru via Google Meet & Zoom. Membangun konsep, logika, dan percaya diri untuk TK, SD, hingga SMP.',
+    hero_cta_text: 'Daftar Kelas Sekarang!',
     hero_cta_link: 'daftar.html',
   },
   features: {
@@ -1723,7 +1723,7 @@ export const CMS: React.FC = () => {
                         type="email"
                         value={formData.footer?.footer_email || ''}
                         onChange={(e) => updateField('footer', 'footer_email', e.target.value)}
-                        placeholder="hello@djuniors.id"
+                        placeholder="admin@djuniorslc.com"
                         style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                       />
                     </div>
@@ -1735,7 +1735,7 @@ export const CMS: React.FC = () => {
                         type="text"
                         value={formData.footer?.footer_phone || ''}
                         onChange={(e) => updateField('footer', 'footer_phone', e.target.value)}
-                        placeholder="081234567890"
+                        placeholder="0877 1497 7001"
                         style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                       />
                     </div>
@@ -1749,7 +1749,7 @@ export const CMS: React.FC = () => {
                       type="text"
                       value={formData.footer?.footer_address || ''}
                       onChange={(e) => updateField('footer', 'footer_address', e.target.value)}
-                      placeholder="Jakarta, Indonesia"
+                      placeholder="Perum Bringin Indah Persada C 9 Tulungrejo, Pare, Kediri, Jawa Timur"
                       style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                     />
                   </div>

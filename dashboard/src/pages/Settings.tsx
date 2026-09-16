@@ -23,23 +23,30 @@ import { paymentsApi, notificationsApi, authApi, BankAccount } from '../utils/ap
 const DEFAULT_BANKS: BankAccount[] = [
   {
     id: 'bank-001',
-    bank_name: 'BCA (Bank Central Asia)',
-    account_number: '1234567890',
-    account_name: 'PT Djuniors Indonesia',
+    bank_name: 'BCA Syariah',
+    account_number: '8881016052',
+    account_name: 'Wahyu Adi Syahputra',
     is_active: 1,
   },
   {
     id: 'bank-002',
     bank_name: 'Bank Mandiri',
-    account_number: '123456789012345',
-    account_name: 'PT Djuniors Indonesia',
+    account_number: '1830000895994',
+    account_name: 'Wahyu Adi Syahputra',
     is_active: 1,
   },
   {
     id: 'bank-003',
-    bank_name: 'Bank BNI',
-    account_number: '9876543210',
-    account_name: 'PT Djuniors Indonesia',
+    bank_name: 'Bank BRI',
+    account_number: '105501017176507',
+    account_name: 'Wahyu Adi Syahputra',
+    is_active: 1,
+  },
+  {
+    id: 'bank-004',
+    bank_name: 'DANA Wallet',
+    account_number: '081252218206',
+    account_name: 'Wahyu Adi Syahputra',
     is_active: 1,
   },
 ];
@@ -53,9 +60,9 @@ export const Settings: React.FC = () => {
   // Banks State
   const [banks, setBanks] = useState<BankAccount[]>(DEFAULT_BANKS);
   const [isAddBankModalOpen, setIsAddBankModalOpen] = useState<boolean>(false);
-  const [newBankName, setNewBankName] = useState<string>('BCA (Bank Central Asia)');
+  const [newBankName, setNewBankName] = useState<string>('BCA Syariah');
   const [newAccountNumber, setNewAccountNumber] = useState<string>('');
-  const [newAccountName, setNewAccountName] = useState<string>('PT Djuniors Indonesia');
+  const [newAccountName, setNewAccountName] = useState<string>('Wahyu Adi Syahputra');
 
   // WhatsApp State
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
@@ -67,11 +74,11 @@ export const Settings: React.FC = () => {
   const [waAutoNotifyReminder, setWaAutoNotifyReminder] = useState<boolean>(true);
 
   // Institution Profile State
-  const [brandName, setBrandName] = useState<string>('Djuniors Matematika Anak');
-  const [brandTagline, setBrandTagline] = useState<string>('Bimbel Matematika Asyik, Cerdas, dan Menyenangkan untuk TK & SD');
-  const [contactPhone, setContactPhone] = useState<string>('+62 812-3456-7890');
-  const [contactEmail, setContactEmail] = useState<string>('halo@djuniors.id');
-  const [contactAddress, setContactAddress] = useState<string>('Jl. Matematika Ceria No. 12, Kebayoran Baru, Jakarta Selatan');
+  const [brandName, setBrandName] = useState<string>('D’Juniors Learning Center');
+  const [brandTagline, setBrandTagline] = useState<string>('Lembaga pembelajaran online yang membantu anak belajar Matematika dengan cara menyenangkan, interaktif, dan sesuai kemampuan masing-masing anak');
+  const [contactPhone, setContactPhone] = useState<string>('0877 1497 7001');
+  const [contactEmail, setContactEmail] = useState<string>('admin@djuniorslc.com');
+  const [contactAddress, setContactAddress] = useState<string>('Perum Bringin Indah Persada C 9 Tulungrejo, Pare, Kediri, Jawa Timur');
 
   // Security / Password State
   const [oldPassword, setOldPassword] = useState<string>('');
@@ -140,7 +147,7 @@ export const Settings: React.FC = () => {
       id: `bank-${Date.now().toString().slice(-4)}`,
       bank_name: newBankName,
       account_number: newAccountNumber.trim(),
-      account_name: newAccountName.trim() || 'PT Djuniors Indonesia',
+      account_name: newAccountName.trim() || 'Wahyu Adi Syahputra',
       is_active: 1,
     };
 
@@ -970,7 +977,7 @@ export const Settings: React.FC = () => {
                   required
                   value={newAccountName}
                   onChange={(e) => setNewAccountName(e.target.value)}
-                  placeholder="Contoh: PT Djuniors Indonesia"
+                  placeholder="Contoh: Wahyu Adi Syahputra"
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                 />
               </div>
