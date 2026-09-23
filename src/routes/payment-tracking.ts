@@ -11,6 +11,7 @@ import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2 } from '../utils/payment';
+import { getPayableAmount } from '../utils/payment-code';
 import { sendCsWaAuto } from '../utils/cs-wa';
 
 const paymentTracking = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -217,7 +218,7 @@ paymentTracking.post('/', async (c) => {
     }
 
     const regId = registration.id as string;
-    const finalAmount = amount !== undefined ? amount : ((registration.final_amount as number) || 0);
+    const finalAmount = amount !== undefined ? amount : getPayableAmount(registration as any);
     const method = paymentMethod || (registration.payment_method as string) || 'bank_transfer';
     const phone = parentPhone || (registration.parent_phone as string);
 

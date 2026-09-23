@@ -22,7 +22,7 @@ import {
   Shuffle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { paymentsApi, notificationsApi, authApi, adminAccountsApi, rotatorApi, BankAccount, AdminAccountItem } from '../utils/api';
+import { paymentsApi, notificationsApi, authApi, adminAccountsApi, rotatorApi, paymentCodeApi, BankAccount, AdminAccountItem, UniqueCodeConfig } from '../utils/api';
 
 const DEFAULT_BANKS: BankAccount[] = [
   {
@@ -97,6 +97,10 @@ export const Settings: React.FC = () => {
   const [rotatorEnabled, setRotatorEnabled] = useState<boolean>(false);
   const [rotatorRefs, setRotatorRefs] = useState<string[]>([]);
   const [isSavingRotator, setIsSavingRotator] = useState<boolean>(false);
+  // Kode unik pembayaran (nominal unik per pendaftaran, diatur admin)
+  const [uniqueCode, setUniqueCode] = useState<UniqueCodeConfig>({ enabled: false, min: 1, max: 999 });
+  const [isSavingUniqueCode, setIsSavingUniqueCode] = useState<boolean>(false);
+  const [uniqueCodeNotice, setUniqueCodeNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const isAdminRole = user?.role === 'admin' || user?.role === 'super_admin';
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
   const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
@@ -179,6 +183,45 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     loadRotator();
   }, [loadRotator]);
+
+  // Muat setelan kode unik pembayaran (admin saja).
+  const loadUniqueCode = useCallback(async () => {
+    if (!isAdminRole) return;
+    try {
+      const res = await paymentCodeApi.get();
+      if (res.unique_code) setUniqueCode(res.unique_code);
+    } catch {
+      // non-fatal: kartu menampilkan nilai default
+    }
+  }, [isAdminRole]);
+
+  useEffect(() => {
+    loadUniqueCode();
+  }, [loadUniqueCode]);
+
+  const handleSaveUniqueCode = async () => {
+    try {
+      setIsSavingUniqueCode(true);
+      setUniqueCodeNotice(null);
+      const res = await paymentCodeApi.save({
+        enabled: uniqueCode.enabled,
+        min: uniqueCode.min,
+        max: uniqueCode.max,
+      });
+      if (res.unique_code) setUniqueCode(res.unique_code);
+      setUniqueCodeNotice({
+        text: res.message || 'Setelan kode unik tersimpan',
+        type: 'success',
+      });
+      showToast(res.message || 'Setelan kode unik pembayaran tersimpan', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan setelan kode unik';
+      setUniqueCodeNotice({ text: msg, type: 'error' });
+      showToast(msg, 'error');
+    } finally {
+      setIsSavingUniqueCode(false);
+    }
+  };
 
   const toggleRotatorMember = (refCode: string, on: boolean) => {
     setRotatorRefs((prev) => (on ? [...prev, refCode] : prev.filter((r) => r !== refCode)));
@@ -754,6 +797,168 @@ export const Settings: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Kode unik pembayaran */}
+          {isAdminRole && (
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '16px',
+                border: '1px solid #E2E8F0',
+                padding: '1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.25rem', margin: '0 0 4px 0', color: '#1E293B' }}>
+                    Kode Unik Pembayaran
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B', maxWidth: '620px' }}>
+                    Menambahkan angka unik ke nominal tagihan setiap pendaftaran (contoh: tagihan Rp 150.000 → transfer
+                    Rp 150.{String(uniqueCode.min).padStart(3, '0')}). Memudahkan pencocokan transfer yang jumlahnya sama.
+                    Nominal asli tetap tercatat utuh untuk laporan.
+                  </p>
+                </div>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: uniqueCode.enabled ? '#047857' : '#94A3B8',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={uniqueCode.enabled}
+                    onChange={(e) => setUniqueCode((prev) => ({ ...prev, enabled: e.target.checked }))}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  {uniqueCode.enabled ? 'AKTIF' : 'NONAKTIF'}
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
+                <div>
+                  <label
+                    htmlFor="unique-code-min"
+                    style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '6px' }}
+                  >
+                    KODE TERKECIL
+                  </label>
+                  <input
+                    id="unique-code-min"
+                    type="number"
+                    min={1}
+                    max={9999}
+                    value={uniqueCode.min}
+                    onChange={(e) => setUniqueCode((prev) => ({ ...prev, min: Number(e.target.value) }))}
+                    style={{
+                      width: '130px',
+                      padding: '0.6rem 0.8rem',
+                      borderRadius: '10px',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '0.9rem',
+                      fontFamily: 'inherit',
+                      color: '#1E293B',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="unique-code-max"
+                    style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '6px' }}
+                  >
+                    KODE TERBESAR
+                  </label>
+                  <input
+                    id="unique-code-max"
+                    type="number"
+                    min={1}
+                    max={9999}
+                    value={uniqueCode.max}
+                    onChange={(e) => setUniqueCode((prev) => ({ ...prev, max: Number(e.target.value) }))}
+                    style={{
+                      width: '130px',
+                      padding: '0.6rem 0.8rem',
+                      borderRadius: '10px',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '0.9rem',
+                      fontFamily: 'inherit',
+                      color: '#1E293B',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    flex: '1 1 240px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px dashed #CBD5E1',
+                    borderRadius: '10px',
+                    padding: '0.7rem 0.9rem',
+                    fontSize: '0.82rem',
+                    color: '#334155',
+                  }}
+                >
+                  <div style={{ fontWeight: 800, color: '#475569', marginBottom: '2px' }}>Contoh tagihan Rp 150.000</div>
+                  {uniqueCode.enabled ? (
+                    <>
+                      → transfer <strong>Rp {(150000 + (Number(uniqueCode.min) || 0)).toLocaleString('id-ID')}</strong> s/d{' '}
+                      <strong>Rp {(150000 + (Number(uniqueCode.max) || 0)).toLocaleString('id-ID')}</strong>
+                    </>
+                  ) : (
+                    <>→ transfer <strong>Rp 150.000</strong> (tanpa kode unik)</>
+                  )}
+                </div>
+                <button
+                  onClick={handleSaveUniqueCode}
+                  disabled={isSavingUniqueCode}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.7rem 1.4rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: isSavingUniqueCode ? '#94A3B8' : '#4A90D9',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 800,
+                    cursor: isSavingUniqueCode ? 'wait' : 'pointer',
+                  }}
+                >
+                  <Save size={16} />
+                  {isSavingUniqueCode ? 'Menyimpan...' : 'Simpan Setelan'}
+                </button>
+              </div>
+
+              {uniqueCodeNotice && (
+                <div
+                  style={{
+                    padding: '0.7rem 1rem',
+                    borderRadius: '10px',
+                    backgroundColor: uniqueCodeNotice.type === 'success' ? '#ECFDF5' : '#FEF2F2',
+                    border: `1px solid ${uniqueCodeNotice.type === 'success' ? '#A7F3D0' : '#FECACA'}`,
+                    color: uniqueCodeNotice.type === 'success' ? '#047857' : '#B91C1C',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  {uniqueCodeNotice.text}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

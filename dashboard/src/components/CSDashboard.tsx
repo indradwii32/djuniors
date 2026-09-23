@@ -2,7 +2,8 @@
 // Djuniors Dashboard - Dashboard Ringkas untuk Role CS
 // ============================================
 // Menampilkan statistik milik CS masing-masing (dari link ?ref= miliknya):
-// total pendaftaran, yang lunas, nominal terkumpul, dan antrian verifikasi.
+// total pendaftaran, yang lunas, dan antrian verifikasi — TANPA nominal uang
+// (permintaan pemilik produk: CS tidak perlu melihat nilai rupiah).
 // Plus kartu link pendaftaran milik CS dengan tombol salin.
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,6 @@ import {
   UserCheck,
   CheckCircle2,
   Clock,
-  Wallet,
   Link2,
   Copy,
   ClipboardCheck,
@@ -19,9 +19,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { csApi, CsOverview, buildRefLink } from '../utils/api';
-
-const formatIDR = (val?: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
 
 export const CSDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -77,14 +74,6 @@ export const CSDashboard: React.FC = () => {
       color: '#059669',
       bg: '#ECFDF5',
       hint: 'Lunas & terkonfirmasi',
-    },
-    {
-      label: 'Nominal Terkumpul',
-      value: formatIDR(overview?.revenue),
-      icon: Wallet,
-      color: '#B45309',
-      bg: '#FEF3C7',
-      hint: 'Dari pendaftaran lunas',
     },
     {
       label: 'Menunggu Verifikasi',

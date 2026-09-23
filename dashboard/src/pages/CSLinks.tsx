@@ -55,7 +55,9 @@ export const CSLinks: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  // Multi-pilih kelas: generator bisa membuat beberapa link per kelas sekaligus
+  // (bukan hanya satu link umum atau satu kelas saja).
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -74,7 +76,8 @@ export const CSLinks: React.FC = () => {
       if (clsRes.status === 'fulfilled' && Array.isArray(clsRes.value)) {
         const active = clsRes.value.filter((c) => Boolean(c.is_active));
         setClasses(active);
-        setSelectedClassId((prev) => prev || active[0]?.id || '');
+        // Awalnya kelas pertama dipilih supaya link per-kelas langsung terlihat.
+        setSelectedClassIds((prev) => (prev.length > 0 ? prev : active[0]?.id ? [active[0].id] : []));
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Gagal memuat data link');
@@ -109,8 +112,18 @@ export const CSLinks: React.FC = () => {
   const refCode = overview?.ref_code || '';
   const byClass = overview?.by_class || [];
   const classStatById = new Map(byClass.map((c) => [c.class_id, c]));
-  const selectedClass = classes.find((c) => c.id === selectedClassId) || null;
-  const selectedLink = refCode && selectedClass ? buildClassRefLink(refCode, selectedClass.id) : '';
+  const selectedClasses = classes.filter((c) => selectedClassIds.includes(c.id));
+  // Teks siap tempel (WhatsApp/chat): satu baris per kelas terpilih.
+  const bulkLinksText = selectedClasses
+    .map((c) => `- ${c.name}${c.level_name ? ` (Level ${c.level_name})` : ''}: ${buildClassRefLink(refCode, c.id)}`)
+    .join('\n');
+
+  const toggleClassSelection = (id: string, on: boolean) => {
+    setSelectedClassIds((prev) => {
+      if (on) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((x) => x !== id);
+    });
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -342,7 +355,8 @@ export const CSLinks: React.FC = () => {
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1E293B' }}>Generator Link per Kelas</div>
                 <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
-                  Pilih kelas → link otomatis mengunci jenjang/level/kelas tersebut. Pendaftar tinggal memilih jam & jadwal.
+                  Centang satu atau beberapa kelas → setiap kelas dapat link sendiri yang mengunci jenjang/level/kelasnya.
+                  Pendaftar tinggal memilih jam & jadwal.
                 </div>
               </div>
             </div>
@@ -355,171 +369,212 @@ export const CSLinks: React.FC = () => {
               <div style={{ color: '#64748B', fontSize: '0.9rem' }}>Belum ada kelas aktif yang bisa dibuatkan link.</div>
             ) : (
               <>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'flex-end' }}>
-                  <div style={{ flex: '1 1 260px', minWidth: '220px' }}>
-                    <label
-                      htmlFor="class-link-select"
-                      style={{
-                        display: 'block',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        color: '#475569',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      Pilih Kelas
-                    </label>
-                    <select
-                      id="class-link-select"
-                      value={selectedClassId}
-                      onChange={(e) => setSelectedClassId(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.7rem 0.85rem',
-                        borderRadius: '10px',
-                        border: '1px solid #E2E8F0',
-                        fontSize: '0.9rem',
-                        fontFamily: 'inherit',
-                        color: '#1E293B',
-                        backgroundColor: '#FFFFFF',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                          {c.level_name ? ` — Level ${c.level_name}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {selectedLink && (
-                  <div
+                {/* Kontrol pilih kelas */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
+                  <span
                     style={{
-                      border: '1px solid #DDD6FE',
-                      backgroundColor: '#FAF5FF',
-                      borderRadius: '12px',
-                      padding: '1rem 1.1rem',
+                      backgroundColor: '#F5F3FF',
+                      color: '#6D28D9',
+                      padding: '5px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
                     }}
                   >
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>
-                      Link untuk {selectedClass?.name}
-                    </div>
-                    <div
+                    {selectedClassIds.length} dari {classes.length} kelas dipilih
+                  </span>
+                  <button
+                    onClick={() => setSelectedClassIds(classes.map((c) => c.id))}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '9px',
+                      border: '1px solid #DDD6FE',
+                      backgroundColor: '#FFFFFF',
+                      color: '#6D28D9',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Pilih Semua Kelas
+                  </button>
+                  <button
+                    onClick={() => setSelectedClassIds([])}
+                    style={{
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '9px',
+                      border: '1px solid #E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                      color: '#64748B',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Kosongkan
+                  </button>
+                  {selectedClasses.length > 0 && (
+                    <button
+                      onClick={() => copy('bulk', bulkLinksText)}
                       style={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.9rem',
-                        color: '#1E293B',
-                        wordBreak: 'break-all',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E9D5FF',
-                        borderRadius: '8px',
-                        padding: '0.65rem 0.8rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '0.45rem 1rem',
+                        borderRadius: '9px',
+                        border: 'none',
+                        backgroundColor: copied === 'bulk' ? '#6BCB77' : '#6D28D9',
+                        color: '#FFFFFF',
+                        fontWeight: 800,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
                       }}
                     >
-                      {selectedLink}
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => copy('selected', selectedLink)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '0.6rem 1.1rem',
-                          borderRadius: '10px',
-                          border: 'none',
-                          backgroundColor: copied === 'selected' ? '#6BCB77' : '#6D28D9',
-                          color: '#FFFFFF',
-                          fontWeight: 800,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {copied === 'selected' ? <CheckCircle2 size={15} /> : <Copy size={15} />}
-                        {copied === 'selected' ? 'Tersalin!' : 'Salin Link Kelas'}
-                      </button>
-                      <button
-                        onClick={() => window.open(selectedLink, '_blank', 'noopener')}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '0.6rem 1.1rem',
-                          borderRadius: '10px',
-                          border: '1px solid #DDD6FE',
-                          backgroundColor: '#FFFFFF',
-                          color: '#6D28D9',
-                          fontWeight: 700,
-                          fontSize: '0.85rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <ExternalLink size={15} /> Pratinjau
-                      </button>
-                    </div>
-                  </div>
-                )}
+                      {copied === 'bulk' ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                      {copied === 'bulk' ? 'Tersalin!' : `Salin Semua Link (${selectedClasses.length})`}
+                    </button>
+                  )}
+                </div>
 
-                {/* Rincian per kelas + tombol salin cepat */}
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                    <thead>
-                      <tr style={{ textAlign: 'left', color: '#64748B', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Kelas</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Pendaftaran</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Dibayar</th>
-                        <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Link Kelas</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {classes.map((c) => {
-                        const stat = classStatById.get(c.id);
+                {/* Daftar kelas dengan centang + statistik */}
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  {classes.map((c) => {
+                    const stat = classStatById.get(c.id);
+                    const link = buildClassRefLink(refCode, c.id);
+                    const checked = selectedClassIds.includes(c.id);
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          flexWrap: 'wrap',
+                          padding: '0.7rem 0.9rem',
+                          borderRadius: '12px',
+                          border: `1px solid ${checked ? '#DDD6FE' : '#E2E8F0'}`,
+                          backgroundColor: checked ? '#FAF5FF' : '#FFFFFF',
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            cursor: 'pointer',
+                            flex: '1 1 220px',
+                            minWidth: 0,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => toggleClassSelection(c.id, e.target.checked)}
+                            aria-label={`Pilih kelas ${c.name}`}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                          />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            <BookOpen size={15} color="#6D28D9" />
+                            <span style={{ fontWeight: 700, color: '#1E293B' }}>{c.name}</span>
+                            {c.level_name && (
+                              <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 700 }}>
+                                Level {c.level_name}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+
+                        <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700 }}>
+                          {stat?.total ?? 0} pendaftaran · <span style={{ color: '#059669' }}>{stat?.paid ?? 0} dibayar</span>
+                        </span>
+
+                        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+                          <button
+                            onClick={() => copy(`row-${c.id}`, link)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '0.45rem 0.8rem',
+                              borderRadius: '8px',
+                              border: '1px solid #E2E8F0',
+                              backgroundColor: copied === `row-${c.id}` ? '#ECFDF5' : '#FFFFFF',
+                              color: copied === `row-${c.id}` ? '#059669' : '#475569',
+                              fontWeight: 700,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {copied === `row-${c.id}` ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                            {copied === `row-${c.id}` ? 'Tersalin' : 'Salin Link'}
+                          </button>
+                          <button
+                            onClick={() => window.open(link, '_blank', 'noopener')}
+                            title={`Pratinjau form untuk ${c.name}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '0.45rem 0.7rem',
+                              borderRadius: '8px',
+                              border: '1px solid #DDD6FE',
+                              backgroundColor: '#FFFFFF',
+                              color: '#6D28D9',
+                              fontWeight: 700,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <ExternalLink size={14} /> Pratinjau
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Hasil link untuk kelas terpilih */}
+                {selectedClasses.length > 0 ? (
+                  <div style={{ border: '1px solid #DDD6FE', backgroundColor: '#FAF5FF', borderRadius: '12px', padding: '1rem 1.1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#6D28D9', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+                      Link siap dibagikan ({selectedClasses.length})
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                      {selectedClasses.map((c) => {
                         const link = buildClassRefLink(refCode, c.id);
                         return (
-                          <tr key={c.id} style={{ borderTop: '1px solid #F1F5F9' }}>
-                            <td style={{ padding: '0.7rem 0.75rem', fontWeight: 700, color: '#1E293B' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <BookOpen size={15} color="#6D28D9" />
-                                {c.name}
-                              </span>
-                              {c.level_name && (
-                                <div style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>Level {c.level_name}</div>
-                              )}
-                            </td>
-                            <td style={{ padding: '0.7rem 0.75rem', color: '#334155' }}>{stat?.total ?? 0}</td>
-                            <td style={{ padding: '0.7rem 0.75rem', color: '#059669', fontWeight: 700 }}>{stat?.paid ?? 0}</td>
-                            <td style={{ padding: '0.7rem 0.75rem', textAlign: 'right' }}>
-                              <button
-                                onClick={() => copy(`row-${c.id}`, link)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  padding: '0.45rem 0.8rem',
-                                  borderRadius: '8px',
-                                  border: '1px solid #E2E8F0',
-                                  backgroundColor: copied === `row-${c.id}` ? '#ECFDF5' : '#FFFFFF',
-                                  color: copied === `row-${c.id}` ? '#059669' : '#475569',
-                                  fontWeight: 700,
-                                  fontSize: '0.78rem',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                {copied === `row-${c.id}` ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                                {copied === `row-${c.id}` ? 'Tersalin' : 'Salin Link'}
-                              </button>
-                            </td>
-                          </tr>
+                          <div key={c.id}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#6D28D9', marginBottom: '4px' }}>
+                              {c.name}
+                              {c.level_name ? ` · Level ${c.level_name}` : ''}
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: 'monospace',
+                                fontSize: '0.82rem',
+                                color: '#1E293B',
+                                wordBreak: 'break-all',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #E9D5FF',
+                                borderRadius: '8px',
+                                padding: '0.55rem 0.7rem',
+                              }}
+                            >
+                              {link}
+                            </div>
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+                    <p style={{ margin: '0.75rem 0 0', fontSize: '0.75rem', color: '#7C3AED' }}>
+                      Tombol <strong>Salin Semua Link</strong> menyalin daftar ini beserta nama kelasnya — praktis untuk ditempel ke WhatsApp.
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: 0 }}>
+                    Belum ada kelas dipilih. Centang kelas di atas untuk membuat link pendaftarannya.
+                  </p>
+                )}
               </>
             )}
           </div>

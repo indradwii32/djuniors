@@ -53,10 +53,38 @@ export const CS_WA_PLACEHOLDERS = [
     '{jadwal}',
     '{nomor_pendaftaran}',
     '{nominal}',
+    '{metode_pembayaran}',
+    '{nama_bank}',
+    '{nomor_rekening}',
+    '{nama_pemilik_rekening}',
+    '{kode_unik}',
+    '{total_transfer}',
     '{link_pembayaran}',
     '{kota}',
     '{cs_name}',
 ];
+
+/**
+ * Deskripsi placeholder untuk UI CS: label ramah + contoh isi, supaya CS tidak
+ * perlu menebak arti tiap variabel saat menyusun template.
+ */
+export const CS_WA_PLACEHOLDER_HINTS: Record<string, { label: string; example: string }> = {
+    '{nama_orang_tua}': { label: 'Nama orang tua/wali', example: 'Budi Santoso' },
+    '{nama_anak}': { label: 'Nama anak', example: 'Rani' },
+    '{kelas}': { label: 'Nama kelas', example: 'Matematika Gembira' },
+    '{jadwal}': { label: 'Jam & jadwal kelas', example: 'Senin (15:00 - 16:00 WIB)' },
+    '{nomor_pendaftaran}': { label: 'Nomor pendaftaran', example: 'DJN-20260923-AB12' },
+    '{nominal}': { label: 'Nominal yang harus ditransfer', example: '150.123' },
+    '{metode_pembayaran}': { label: 'Metode pembayaran dipilih pendaftar', example: 'Transfer Bank' },
+    '{nama_bank}': { label: 'Nama bank / e-wallet / QRIS', example: 'BCA Syariah' },
+    '{nomor_rekening}': { label: 'Nomor rekening / e-wallet', example: '8881016052' },
+    '{nama_pemilik_rekening}': { label: 'Pemilik rekening', example: 'Wahyu Adi Syahputra' },
+    '{kode_unik}': { label: 'Kode unik pembayaran', example: '123' },
+    '{total_transfer}': { label: 'Total transfer (tagihan + kode unik)', example: '150.123' },
+    '{link_pembayaran}': { label: 'Link lacak & unggah bukti', example: 'https://djuniorslc.com/lacak' },
+    '{kota}': { label: 'Kota pendaftar', example: 'Kediri' },
+    '{cs_name}': { label: 'Nama CS pengirim', example: 'CS Dua' },
+};
 
 export function maskToken(token: string): string {
     if (!token) return '';

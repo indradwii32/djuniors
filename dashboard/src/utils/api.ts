@@ -51,8 +51,6 @@ export interface CsOverview {
   ref_code: string;
   total: number;
   paid: number;
-  /** Nominal hanya terisi untuk admin — role CS tidak melihat nilai uang. */
-  revenue: number;
   verifying: number;
   pending_verification: number;
   /** Rincian jumlah pendaftaran per kelas (untuk generator link per-kelas). */
@@ -131,6 +129,11 @@ export interface RegistrationItem {
   bank_account_id?: string | null;
   bank_name?: string | null;
   bank_account_number?: string | null;
+  bank_account_name?: string | null;
+  /** Kode unik pembayaran yang ditambahkan ke tagihan (0 bila dimatikan). */
+  unique_code?: number;
+  /** Nominal yang harus ditransfer = final_amount + unique_code. */
+  payable_amount?: number;
   created_at: string;
   updated_at?: string;
   tracking?: any[];
@@ -757,6 +760,8 @@ export interface CsWaSettingsResponse {
   account: { id: string; name: string; ref_code: string | null };
   settings: CsWaSettings;
   placeholders: string[];
+  /** Label ramah + contoh isi untuk tiap variable (opsional dari server lama). */
+  placeholder_hints?: Record<string, { label: string; example: string }>;
   global_token_set: boolean;
 }
 export interface CsWaResult {
@@ -823,6 +828,27 @@ export const rotatorApi = {
     refs: string[];
   }): Promise<{ success: boolean; rotator: { enabled: boolean; refs: string[] } }> => {
     return apiRequest('/admin/rotator', { method: 'PUT', body: JSON.stringify(payload) });
+  },
+};
+
+// Kode unik pembayaran (Pengaturan → Rekening Pembayaran)
+export interface UniqueCodeConfig {
+  enabled: boolean;
+  min: number;
+  max: number;
+}
+export interface PaymentCodeResponse {
+  success: boolean;
+  unique_code: UniqueCodeConfig;
+  message?: string;
+}
+export const paymentCodeApi = {
+  get: async (): Promise<PaymentCodeResponse> => apiRequest<PaymentCodeResponse>('/admin/payment-code'),
+  save: async (payload: Partial<UniqueCodeConfig>): Promise<PaymentCodeResponse> => {
+    return apiRequest<PaymentCodeResponse>('/admin/payment-code', {
+      method: 'PUT',
+      body: JSON.stringify({ unique_code: payload }),
+    });
   },
 };
 

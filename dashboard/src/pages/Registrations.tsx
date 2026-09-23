@@ -1431,6 +1431,29 @@ export const Registrations: React.FC = () => {
                         {formatIDR(detailModalItem.final_amount ?? detailModalItem.total_amount)}
                       </span>
                     </div>
+
+                    {/* Kode unik pembayaran (bila diaktifkan admin) */}
+                    {Number(detailModalItem.unique_code) > 0 && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.6rem 0.75rem',
+                          borderRadius: '10px',
+                          backgroundColor: '#FFF7ED',
+                          border: '1px solid #FED7AA',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px',
+                        }}
+                      >
+                        <div style={{ fontSize: '0.78rem', color: '#9A3412', fontWeight: 700 }}>
+                          Kode unik: <strong>{Number(detailModalItem.unique_code)}</strong>
+                        </div>
+                        <div style={{ fontSize: '0.9rem', color: '#9A3412', fontWeight: 800 }}>
+                          Total transfer: {formatIDR((detailModalItem.final_amount ?? 0) + Number(detailModalItem.unique_code))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Bukti Transfer Box */}

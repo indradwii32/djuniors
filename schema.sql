@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     bank_name TEXT,
     bank_account_number TEXT,
     bank_account_name TEXT,
+    unique_code INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

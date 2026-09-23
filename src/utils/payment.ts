@@ -84,7 +84,12 @@ export async function getDefaultPaymentAccount(
 export interface PaymentInfo {
     method: PaymentMethod;
     method_label: string;
+    /** Nominal yang harus ditransfer (tagihan + kode unik). */
     amount: number;
+    /** Tagihan asli sebelum kode unik ditambahkan. */
+    base_amount: number;
+    /** Kode unik yang ditambahkan ke nominal (0 bila fitur dimatikan). */
+    unique_code: number;
     account: { name: string; number: string; holder: string } | null;
     instructions: string;
 }
@@ -92,17 +97,24 @@ export interface PaymentInfo {
 /**
  * Susun info pembayaran lengkap (metode + rekening + nominal + instruksi)
  * yang aman dikirim ke halaman publik/popup pendaftaran.
+ *
+ * `amount` adalah nominal yang harus ditransfer; bila ada `uniqueCode`, nominal
+ * tagihan aslinya tetap dilaporkan lewat `base_amount` supaya pendaftar paham
+ * angka unik itu bagian dari tagihan.
  */
 export function buildPaymentInfo(params: {
     method: unknown;
     amount: number;
     account: { bank_name?: string | null; account_number?: string | null; account_name?: string | null } | null;
     registrationNumber?: string | null;
+    uniqueCode?: number;
 }): PaymentInfo {
     const method = normalizePaymentMethod(params.method);
     const amount = Math.max(0, Number(params.amount) || 0);
     const acc = params.account;
     const hasAccount = Boolean(acc && (acc.account_number || acc.bank_name));
+    const uniqueCode = Math.max(0, Math.floor(Number(params.uniqueCode) || 0));
+    const baseAmount = Math.max(0, amount - uniqueCode);
 
     const account = hasAccount
         ? {
@@ -113,22 +125,27 @@ export function buildPaymentInfo(params: {
         : null;
 
     const nominal = `Rp ${amount.toLocaleString('id-ID')}`;
+    const uniqueNote = uniqueCode > 0
+        ? ` Transfer tepat ${nominal} (tagihan Rp ${baseAmount.toLocaleString('id-ID')} + kode unik ${uniqueCode}) agar pembayaran Anda mudah dicocokkan.`
+        : '';
     let instructions: string;
     if (!hasAccount) {
         instructions =
             'Detail pembayaran belum tersedia. Silakan hubungi admin D’Juniors untuk instruksi transfer.';
     } else if (method === 'qris') {
-        instructions = `Scan QRIS resmi D’Juniors sebesar ${nominal}, lalu unggah bukti pembayaran Anda.`;
+        instructions = `Scan QRIS resmi D’Juniors sebesar ${nominal}, lalu unggah bukti pembayaran Anda.${uniqueNote}`;
     } else if (method === 'ewallet') {
-        instructions = `Kirim saldo ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.`;
+        instructions = `Kirim saldo ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.${uniqueNote}`;
     } else {
-        instructions = `Transfer ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.`;
+        instructions = `Transfer ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.${uniqueNote}`;
     }
 
     return {
         method,
         method_label: PAYMENT_METHOD_LABELS[method],
         amount,
+        base_amount: baseAmount,
+        unique_code: uniqueCode,
         account,
         instructions,
     };

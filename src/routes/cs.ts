@@ -18,6 +18,7 @@ import {
     CS_WA_DEFAULT_TPL_REGISTRATION,
     CS_WA_DEFAULT_TPL_PAYMENT,
     CS_WA_PLACEHOLDERS,
+    CS_WA_PLACEHOLDER_HINTS,
 } from '../utils/cs-wa';
 
 const cs = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -95,7 +96,6 @@ cs.get('/overview', adminAuthMiddleware, async (c) => {
     const stats = await c.env.DB.prepare(`
         SELECT COUNT(*) AS total,
                COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END), 0) AS paid,
-               COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN final_amount ELSE 0 END), 0) AS revenue,
                COALESCE(SUM(CASE WHEN payment_status = 'pending' THEN 1 ELSE 0 END), 0) AS verifying
         FROM registrations
         ${where}
@@ -125,15 +125,13 @@ cs.get('/overview', adminAuthMiddleware, async (c) => {
         LIMIT 50
     `).bind(...binds).all();
 
-    // Nominal hanya untuk admin — role CS tidak melihat nilai uang pendaftaran.
-    const isAdminRole = payload.role === 'admin' || payload.role === 'super_admin';
-
+    // Statistik dashboard CS sengaja TANPA nominal uang (permintaan pemilik
+    // produk: role CS tidak melihat nilai rupiah pendaftaran).
     return c.json({
         success: true,
         ref_code: refCode,
         total: Number(stats?.total) || 0,
         paid: Number(stats?.paid) || 0,
-        revenue: isAdminRole ? Number(stats?.revenue) || 0 : 0,
         verifying: Number(stats?.verifying) || 0,
         pending_verification: Number(queue?.n) || 0,
         by_class: (byClass.results || []).map((row: any) => ({
@@ -163,6 +161,7 @@ cs.get('/wa-settings', adminAuthMiddleware, async (c) => {
         account: { id: account.id, name: account.name, ref_code: account.ref_code },
         settings: serializeCsWaSettings(row),
         placeholders: CS_WA_PLACEHOLDERS,
+        placeholder_hints: CS_WA_PLACEHOLDER_HINTS,
         global_token_set: globalToken.length > 0,
     });
 });

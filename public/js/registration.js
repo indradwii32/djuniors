@@ -1015,9 +1015,10 @@ class DjuniorsRegistration {
         if (!modal) return;
 
         const regNumber = data.registration_number || data.registration?.registration_number || '-';
-        const finalAmount = data.registration?.final_amount || 0;
-        const paymentMethod = data.registration?.payment_method || this.selectedPaymentMethod;
         const payment = data.payment || null;
+        // Nominal yang ditampilkan = yang harus ditransfer (tagihan + kode unik).
+        const finalAmount = Number(payment?.amount ?? data.registration?.payable_amount ?? data.registration?.final_amount ?? 0);
+        const paymentMethod = data.registration?.payment_method || this.selectedPaymentMethod;
 
         const modalRegNumberEl = document.getElementById('modal-reg-number');
         const modalTotalAmountEl = document.getElementById('modal-total-amount');
@@ -1110,6 +1111,11 @@ class DjuniorsRegistration {
             <div style="margin-top: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #1E293B;">
                 Nominal: <span style="color: #FF6B35;">${nominal}</span>
             </div>
+            ${Number(payment?.unique_code) > 0
+                ? `<div style="margin-top: 2px; font-size: 0.78rem; color: #64748b;">
+                    Tagihan Rp ${Number(payment.base_amount || 0).toLocaleString('id-ID')} + kode unik <strong>${Number(payment.unique_code)}</strong>
+                   </div>`
+                : ''}
             <div style="margin-top: 0.4rem; font-size: 0.78rem; color: #64748b;">
                 Kode referensi: <strong style="font-family: monospace;">${this.escapeHtml(regNumber || '')}</strong>
             </div>

@@ -203,8 +203,25 @@ export function formatWATemplate(
     );
 
     // Amounts
-    const rawNominal = data.nominal ?? data.amount ?? data.tagihan_akhir ?? data.final_amount ?? data.finalAmount;
+    // Kode unik pembayaran (opsional): nominal yang harus ditransfer =
+    // tagihan + kode unik. Tanpa fitur ini, nilainya sama dengan tagihan.
+    const uniqueCodeRaw = data.kode_unik ?? data.unique_code ?? data.uniqueCode;
+    const uniqueCode = Math.max(0, Math.floor(Number(uniqueCodeRaw) || 0));
+
+    const baseFinalRaw = data.tagihan_dasar ?? data.base_amount ?? data.final_amount ?? data.finalAmount ?? data.amount;
+    const payableRaw = data.payable_amount ?? data.total_transfer ?? data.totalTransfer;
+    const payableValue =
+        payableRaw !== undefined && payableRaw !== null && payableRaw !== ''
+            ? Number(payableRaw)
+            : Number(baseFinalRaw ?? 0) + uniqueCode;
+    const hasPayable = Number.isFinite(payableValue) && (payableRaw !== undefined || uniqueCode > 0 || baseFinalRaw !== undefined);
+
+    const rawNominal = data.nominal ?? (hasPayable ? payableValue : undefined) ?? data.amount;
     const formattedNominal = formatAmount(rawNominal);
+
+    const formattedPayable = formatAmount(hasPayable ? payableValue : rawNominal);
+    const formattedBaseAmount = formatAmount(baseFinalRaw ?? rawNominal);
+    const formattedUniqueCode = uniqueCode > 0 ? String(uniqueCode) : '';
 
     const rawTotal = data.total_biaya ?? data.total_amount ?? data.totalAmount ?? data.total;
     const formattedTotal = formatAmount(rawTotal !== undefined ? rawTotal : rawNominal);
@@ -212,7 +229,7 @@ export function formatWATemplate(
     const rawDiscount = data.diskon_nominal ?? data.discount_amount ?? data.discountAmount;
     const formattedDiscountAmount = formatAmount(rawDiscount);
 
-    const rawFinal = data.tagihan_akhir ?? data.final_amount ?? data.finalAmount ?? data.nominal ?? data.amount;
+    const rawFinal = hasPayable ? payableValue : (data.tagihan_akhir ?? data.final_amount ?? data.finalAmount ?? data.nominal ?? data.amount);
     const formattedFinalAmount = formatAmount(rawFinal !== undefined ? rawFinal : rawTotal);
 
     // Promo & Discount string
@@ -240,6 +257,7 @@ export function formatWATemplate(
         data.nomor_rekening ??
         data.rekening ??
         data.account ??
+        data.bank_account_number ??
         data.account_number ??
         data.accountNumber ??
         ''
@@ -247,6 +265,7 @@ export function formatWATemplate(
 
     const accountOwner = String(
         data.nama_pemilik_rekening ??
+        data.bank_account_name ??
         data.account_name ??
         data.accountName ??
         data.atas_nama ??
@@ -396,6 +415,15 @@ export function formatWATemplate(
         accountName: accountOwner,
         atas_nama: accountOwner,
         pemilik_rekening: accountOwner,
+
+        // Kode unik & total transfer
+        kode_unik: formattedUniqueCode,
+        unique_code: formattedUniqueCode,
+        uniqueCode: formattedUniqueCode,
+        total_transfer: formattedPayable,
+        payable_amount: formattedPayable,
+        tagihan_dasar: formattedBaseAmount,
+        base_amount: formattedBaseAmount,
 
         // Time
         waktu: timeStr,

@@ -707,7 +707,8 @@ class DjuniorsTracking {
                 body: JSON.stringify({
                     proof_url: this.proofBase64,
                     payment_method: paymentMethod,
-                    amount: reg.final_amount || 0,
+                    // Nominal yang benar-benar ditransfer (tagihan + kode unik bila aktif).
+                    amount: Number(reg.payable_amount ?? ((reg.final_amount || 0) + (Number(reg.unique_code) || 0))),
                     notes: notes
                 })
             });

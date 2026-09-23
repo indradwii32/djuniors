@@ -7,6 +7,7 @@ import { Bindings, Variables, Registration, RegistrationChild } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2, getDefaultPaymentAccount, buildPaymentInfo, normalizePaymentMethod, maskPhone, resolvePaymentMethod, PaymentMethod } from '../utils/payment';
+import { pickUniqueCode, getPayableAmount } from '../utils/payment-code';
 import { sendCsWaAuto } from '../utils/cs-wa';
 import { nextRotatorRef } from '../utils/cs-rotator';
 import { rateLimit } from '../utils/rate-limit';
@@ -268,14 +269,21 @@ registrations.post('/', registerLimiter, async (c) => {
     const bankNumber: string | null = defaultAccount?.account_number ? String(defaultAccount.account_number) : null;
     const bankHolder: string | null = defaultAccount?.account_name ? String(defaultAccount.account_name) : null;
 
+    // Kode unik pembayaran (opsional, diatur admin): ditambahkan ke nominal
+    // tagihan agar transfer mudah dicocokkan. Disimpan terpisah dari
+    // final_amount supaya laporan pendapatan tetap bersih.
+    const uniqueCode = await pickUniqueCode(c.env.DB, finalAmount);
+    const payableAmount = finalAmount + uniqueCode;
+
     // Insert registration
     await c.env.DB.prepare(`
         INSERT INTO registrations (
             id, registration_number, parent_name, parent_phone, parent_email, parent_city,
             class_id, schedule_slot, children, total_amount, discount_amount, final_amount,
             promo_code, payment_method, status, payment_status, notes,
-            ref_code, bank_account_id, bank_name, bank_account_number, bank_account_name
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?)
+            ref_code, bank_account_id, bank_name, bank_account_number, bank_account_name,
+            unique_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?, ?)
     `).bind(
         id,
         registrationNumber,
@@ -296,10 +304,11 @@ registrations.post('/', registerLimiter, async (c) => {
         bankAccountId,
         bankName,
         bankNumber,
-        bankHolder
+        bankHolder,
+        uniqueCode
     ).run();
 
-    // Create initial payment tracking record
+    // Create initial payment tracking record (nominal = yang harus ditransfer).
     const trackingId = crypto.randomUUID();
     await c.env.DB.prepare(`
         INSERT INTO payment_tracking (
@@ -310,7 +319,7 @@ registrations.post('/', registerLimiter, async (c) => {
         id,
         registrationNumber,
         parentPhoneStr,
-        finalAmount,
+        payableAmount,
         method,
         'Registrasi baru dibuat'
     ).run();
@@ -332,7 +341,14 @@ registrations.post('/', registerLimiter, async (c) => {
             schedule_slot: scheduleSlotStr,
             children: parsedChildren,
             total_amount: totalAmount,
+            discount_amount: discountAmount,
             final_amount: finalAmount,
+            unique_code: uniqueCode,
+            payable_amount: payableAmount,
+            payment_method: method,
+            bank_name: bankName,
+            bank_account_number: bankNumber,
+            bank_account_name: bankHolder,
             payment_status: 'unpaid',
             ref_code: storedRefCode,
             created_at: new Date().toISOString(),
@@ -345,9 +361,10 @@ registrations.post('/', registerLimiter, async (c) => {
     // detail metode yang dipilih pendaftar (bukan semua metode).
     const payment = buildPaymentInfo({
         method,
-        amount: finalAmount,
+        amount: payableAmount,
         account: { bank_name: bankName, account_number: bankNumber, account_name: bankHolder },
         registrationNumber,
+        uniqueCode,
     });
 
     return c.json({
@@ -373,6 +390,8 @@ registrations.post('/', registerLimiter, async (c) => {
             total_amount: totalAmount,
             discount_amount: discountAmount,
             final_amount: finalAmount,
+            unique_code: uniqueCode,
+            payable_amount: payableAmount,
             promo_code: appliedPromoCode,
             payment_method: method,
             status: 'pending',
@@ -580,9 +599,10 @@ registrations.get('/track/:number', trackLimiter, trackCache, async (c) => {
 
     const payment = buildPaymentInfo({
         method: registration.payment_method,
-        amount: Number(registration.final_amount) || 0,
+        amount: getPayableAmount(registration as any),
         account,
         registrationNumber,
+        uniqueCode: Number(registration.unique_code) || 0,
     });
 
     const formatted = formatRegistration(registration);
