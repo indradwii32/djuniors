@@ -48,6 +48,7 @@ import {
   CMSFile,
   CMSIcon,
   ClassItem,
+  PUBLIC_SITE_URL,
 } from '../utils/api';
 import IconPicker, { renderIconPreview } from '../components/IconPicker';
 
@@ -1003,7 +1004,7 @@ export const CMS: React.FC = () => {
           </button>
 
           <a
-            href="/"
+            href={PUBLIC_SITE_URL}
             target="_blank"
             rel="noopener noreferrer"
             style={{

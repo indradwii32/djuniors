@@ -16,7 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { notificationsApi, authApi } from '../utils/api';
+import { notificationsApi, authApi, PUBLIC_SITE_URL } from '../utils/api';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -222,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* External link to main website */}
           <a
-            href="/"
+            href={PUBLIC_SITE_URL}
             target="_blank"
             rel="noopener noreferrer"
             title="Kunjungi Website Utama"

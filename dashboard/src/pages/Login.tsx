@@ -15,6 +15,7 @@ import {
   Key,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { PUBLIC_SITE_URL } from '../utils/api';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -429,7 +430,7 @@ export const Login: React.FC = () => {
           {/* Back to Public Web */}
           <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
             <a
-              href="/"
+              href={PUBLIC_SITE_URL}
               style={{
                 fontSize: '0.85rem',
                 color: '#64748B',

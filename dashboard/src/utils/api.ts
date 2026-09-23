@@ -356,11 +356,16 @@ export const setStoredAdminUser = (user: AdminUser): void => {
 // Generic Fetch Wrapper
 export const API_BASE_URL = API_BASE;
 
+// Situs publik (landing page + form pendaftaran). Dashboard admin berada di
+// origin yang berbeda (admin.djuniorslc.com), jadi tautan ke web utama TIDAK
+// boleh memakai path relatif "/" — itu akan kembali ke dashboard sendiri.
+export const PUBLIC_SITE_URL = 'https://djuniorslc.com';
+
 // Link pendaftaran publik untuk sebuah kode CS (?ref=KODE).
 // SELALU memakai URL situs produksi — link dibagikan CS ke calon pendaftar,
 // jadi localhost/origin dev tidak akan pernah bisa dibuka orang tua.
 export const buildRefLink = (refCode: string): string =>
-  `https://djuniorslc.com/daftar.html?ref=${encodeURIComponent(refCode)}`;
+  `${PUBLIC_SITE_URL}/daftar.html?ref=${encodeURIComponent(refCode)}`;
 
 /**
  * Link pendaftaran per-kelas milik satu CS.
@@ -368,7 +373,7 @@ export const buildRefLink = (refCode: string): string =>
  * pendaftar tinggal memilih jam & jadwal.
  */
 export const buildClassRefLink = (refCode: string, classId: string): string =>
-  `https://djuniorslc.com/daftar.html?ref=${encodeURIComponent(refCode)}&class=${encodeURIComponent(classId)}`;
+  `${PUBLIC_SITE_URL}/daftar.html?ref=${encodeURIComponent(refCode)}&class=${encodeURIComponent(classId)}`;
 
 export async function apiRequest<T>(
   endpoint: string,
