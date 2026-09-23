@@ -264,17 +264,17 @@ export const instrumentR2 = (c: Context<{ Bindings: Bindings; Variables: any }>)
         get(target, prop: string | symbol) {
             if (prop === '__isInstrumented') return true; // marker via trap — never written to target
             const value = (target as any)[prop];
-            if (prop === 'get' && typeof value === 'function') {
-                return async (...args: any[]) => {
-                    u.r2Reads += 1;
-                    return value.apply(target, args);
-                };
-            }
-            if (prop === 'head' && typeof value === 'function') {
-                return async (...args: any[]) => {
-                    u.r2Reads += 1;
-                    return value.apply(target, args);
-                };
+            if (typeof value === 'function') {
+                if (prop === 'get' || prop === 'head') {
+                    return async (...args: any[]) => {
+                        u.r2Reads += 1;
+                        return value.apply(target, args);
+                    };
+                }
+                // SEMUA method lain (put/delete/list/…) harus di-bind ke bucket
+                // asli. Memanggil method native dengan `this` = Proxy memicu
+                // "Illegal invocation" di workerd (mis. upload bukti ke R2).
+                return (...args: any[]) => value.apply(target, args);
             }
             return value;
         },

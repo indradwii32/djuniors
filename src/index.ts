@@ -25,6 +25,9 @@ import { generateDashboardSnapshots } from './scheduled/snapshot';
 import enrollmentRoutes from './routes/enrollments';
 import paymentRoutes from './routes/payments';
 import formRoutes from './routes/forms';
+import adminAccountRoutes from './routes/admin-accounts';
+import csRoutes from './routes/cs';
+import { verifyJWT, getJwtSecret } from './utils/jwt';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -95,6 +98,41 @@ app.use('*', async (c, next) => {
     return mw(c, next);
 });
 
+// ============================================
+// Role gate: akun CS hanya boleh menyentuh rute berikut.
+// ============================================
+// Semua endpoint sensitif di bawah sudah memakai adminAuthMiddleware
+// (butuh token valid); token CS valid harus diblokir DI SINI sebelum
+// sampai ke mereka — token tanpa header tidak lolos adminAuthMiddleware
+// (401), jadi gate "hanya saat ada header" sudah cukup aman.
+const CS_ALLOWED_PATTERNS: RegExp[] = [
+    /^\/api\/auth(\/|$)/,          // login, logout, me, ganti password
+    /^\/api\/registrations(\/|$)/, // kelola pendaftaran (di-scope per ref_code)
+    /^\/api\/payment-tracking(\/|$)/, // antrian verifikasi (di-scope per ref_code)
+    /^\/api\/cs(\/|$)/,            // overview link & tracking milik CS
+    /^\/api\/health$/,
+];
+app.use('/api/*', async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+            const payload = await verifyJWT(authHeader.split(' ')[1], await getJwtSecret(c.env));
+            if (payload && payload.type === 'admin' && payload.role === 'cs') {
+                const path = new URL(c.req.url).pathname;
+                if (!CS_ALLOWED_PATTERNS.some((re) => re.test(path))) {
+                    return c.json({
+                        error: 'Forbidden',
+                        message: 'Akun CS hanya memiliki akses ke modul pendaftaran',
+                    }, 403);
+                }
+            }
+        } catch {
+            // Token rusak → biarkan rute tujuan yang memberi 401.
+        }
+    }
+    await next();
+});
+
 // API Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/students', studentRoutes);
@@ -109,6 +147,8 @@ app.route('/api/cms/icons', cmsIconsRoutes);
 app.route('/api/cms', cmsRoutes);
 app.route('/api/admin/usage', adminUsageRoutes);
 app.route('/api/dashboard/snapshots', dashboardSnapshotsRoutes);
+app.route('/api/admin/accounts', adminAccountRoutes);
+app.route('/api/cs', csRoutes);
 
 // Legacy routes fallback
 app.route('/api/enrollments', enrollmentRoutes);

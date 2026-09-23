@@ -99,6 +99,28 @@ export const Registrations: React.FC = () => {
     return [];
   };
 
+  // Buka modal detail + muat data LENGKAP dari GET /:id (bukti bayar,
+  // catatan admin, riwayat tracking) — baris list tidak memuat semuanya.
+  const openDetail = async (reg: RegistrationItem) => {
+    setDetailModalItem(reg);
+    setAdminNotesInput(reg.notes || '');
+    try {
+      const full = await registrationsApi.getById(reg.id);
+      setDetailModalItem({ ...reg, ...full });
+      setAdminNotesInput(full.notes || reg.notes || '');
+    } catch {
+      // fallback: tampilkan data list apa adanya
+    }
+  };
+
+  // Bukti bisa tersimpan di kolom registrasi ATAU di baris tracking terbaru.
+  const getProofUrl = (item: RegistrationItem | null): string | null => {
+    if (!item) return null;
+    if (item.payment_proof_url) return item.payment_proof_url;
+    const fromTracking = (item.tracking || []).find((t: any) => t && t.proof_url);
+    return fromTracking ? fromTracking.proof_url : null;
+  };
+
   // Helper to format currency IDR
   const formatIDR = (val?: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -401,6 +423,9 @@ export const Registrations: React.FC = () => {
   const rejectedCount = registrations.filter(
     (r) => r.status === 'rejected' || r.payment_status === 'rejected'
   ).length;
+
+  // Bukti untuk modal detail (kolom utama, fallback baris tracking)
+  const detailProof = getProofUrl(detailModalItem);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -850,6 +875,22 @@ export const Registrations: React.FC = () => {
                         <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
                           {formatDate(reg.created_at)}
                         </div>
+                        {reg.ref_code && (
+                          <div
+                            style={{
+                              fontSize: '0.7rem',
+                              color: '#6D28D9',
+                              fontWeight: 700,
+                              marginTop: '2px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                            }}
+                            title="Pendaftar datang dari link CS ini"
+                          >
+                            🔗 CS: {reg.ref_code}
+                          </div>
+                        )}
                       </td>
 
                       {/* Orang Tua & WA */}
@@ -964,10 +1005,7 @@ export const Registrations: React.FC = () => {
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
                           <button
                             className="btn-touch-sm"
-                            onClick={() => {
-                              setDetailModalItem(reg);
-                              setAdminNotesInput(reg.notes || '');
-                            }}
+                            onClick={() => openDetail(reg)}
                             title="Lihat Detail & Kelola"
                             style={{
                               display: 'inline-flex',
@@ -1339,6 +1377,22 @@ export const Registrations: React.FC = () => {
                       </span>
                     </div>
 
+                    {detailModalItem.bank_name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748B' }}>
+                        <span>Rekening Tujuan:</span>
+                        <span style={{ fontWeight: 700, color: '#1E293B', textAlign: 'right' }}>
+                          {detailModalItem.bank_name} · {detailModalItem.bank_account_number}
+                        </span>
+                      </div>
+                    )}
+
+                    {detailModalItem.ref_code && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748B' }}>
+                        <span>Sumber Link:</span>
+                        <span style={{ fontWeight: 700, color: '#6D28D9' }}>CS {detailModalItem.ref_code}</span>
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748B' }}>
                       <span>Total Biaya Kursus:</span>
                       <span style={{ fontWeight: 700, color: '#1E293B' }}>
@@ -1397,10 +1451,10 @@ export const Registrations: React.FC = () => {
                       Bukti Pembayaran / Slip Transfer
                     </div>
 
-                    {detailModalItem.payment_proof_url ? (
+                    {detailProof ? (
                       <div style={{ position: 'relative', width: '100%', maxWidth: '240px' }}>
                         <img
-                          src={detailModalItem.payment_proof_url}
+                          src={detailProof}
                           alt="Bukti Transfer"
                           style={{
                             width: '100%',
@@ -1411,11 +1465,11 @@ export const Registrations: React.FC = () => {
                             backgroundColor: '#FFFFFF',
                             cursor: 'pointer',
                           }}
-                          onClick={() => setSelectedProofPreview(detailModalItem.payment_proof_url || null)}
+                          onClick={() => setSelectedProofPreview(detailProof)}
                         />
                         <div style={{ marginTop: '6px' }}>
                           <a
-                            href={detailModalItem.payment_proof_url}
+                            href={detailProof}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{

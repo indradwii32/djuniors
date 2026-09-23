@@ -25,7 +25,35 @@ export interface AdminUser {
   id: string;
   username: string;
   name: string;
-  role: 'super_admin' | 'admin' | string;
+  role: 'super_admin' | 'admin' | 'cs' | string;
+  ref_code?: string | null;
+}
+
+// Akun tim dashboard (admin & CS) — menu Pengaturan → Akun Tim / Link CS
+export interface AdminAccountItem {
+  id: string;
+  username: string;
+  name: string;
+  role: 'super_admin' | 'admin' | 'cs' | string;
+  ref_code?: string | null;
+  is_active: boolean | number;
+  last_login?: string | null;
+  created_at?: string;
+  // statistik agregat dari LEFT JOIN registrations ON ref_code
+  reg_total?: number;
+  reg_paid?: number;
+  reg_revenue?: number;
+}
+
+// Statistik ringkas dashboard CS (/api/cs/overview)
+export interface CsOverview {
+  success: boolean;
+  ref_code: string;
+  total: number;
+  paid: number;
+  revenue: number;
+  verifying: number;
+  pending_verification: number;
 }
 
 export interface LoginResponse {
@@ -88,6 +116,11 @@ export interface RegistrationItem {
   status: 'pending' | 'confirmed' | 'rejected' | string;
   payment_status: 'unpaid' | 'paid' | 'rejected' | string;
   notes?: string;
+  // Sumber link CS + snapshot rekening terpilih
+  ref_code?: string | null;
+  bank_account_id?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
   created_at: string;
   updated_at?: string;
   tracking?: any[];
@@ -309,6 +342,14 @@ export const setStoredAdminUser = (user: AdminUser): void => {
 };
 
 // Generic Fetch Wrapper
+export const API_BASE_URL = API_BASE;
+
+// Link pendaftaran publik untuk sebuah kode CS (?ref=KODE).
+// SELALU memakai URL situs produksi — link dibagikan CS ke calon pendaftar,
+// jadi localhost/origin dev tidak akan pernah bisa dibuka orang tua.
+export const buildRefLink = (refCode: string): string =>
+  `https://djuniorslc.com/daftar.html?ref=${encodeURIComponent(refCode)}`;
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -607,11 +648,29 @@ export const enrollmentsApi = {
   },
 };
 
-// Payment Tracking Endpoints
+// Payment Tracking Endpoints (menu Verifikasi Pembayaran)
+export interface PaymentTrackingPagination {
+  page: number;
+  limit: number;
+  offset: number;
+  total: number;
+  total_pages: number;
+}
+
 export const paymentTrackingApi = {
-  getAll: async (status?: string): Promise<any[]> => {
-    const qs = status && status !== 'all' ? `?status=${status}` : '';
-    return apiRequest<any[]>(`/payment-tracking${qs}`);
+  getAll: async (params?: {
+    status?: string;      // pending | confirmed | rejected | all
+    queue?: boolean;      // true → hanya yang punya bukti & masih pending
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; pagination: PaymentTrackingPagination }> => {
+    const query = new URLSearchParams();
+    if (params?.status && params.status !== 'all') query.append('status', params.status);
+    if (params?.queue) query.append('queue', 'true');
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest<{ data: any[]; pagination: PaymentTrackingPagination }>(`/payment-tracking${qs}`);
   },
   getByNumber: async (regNumber: string): Promise<any> => {
     return apiRequest<any>(`/payment-tracking/${encodeURIComponent(regNumber)}`);
@@ -625,6 +684,35 @@ export const paymentTrackingApi = {
       method: 'PUT',
       body: JSON.stringify({ status, notes }),
     });
+  },
+};
+
+// Admin / Team Accounts Endpoints (menu Pengaturan → Akun Tim)
+export const adminAccountsApi = {
+  list: async (): Promise<{ success: boolean; accounts: AdminAccountItem[] }> => {
+    return apiRequest<{ success: boolean; accounts: AdminAccountItem[] }>('/admin/accounts');
+  },
+  create: async (data: {
+    username: string;
+    name: string;
+    password: string;
+    role?: 'cs' | 'admin';
+  }): Promise<{ success: boolean; account: AdminAccountItem; link_ref?: string | null; message?: string }> => {
+    return apiRequest('/admin/accounts', { method: 'POST', body: JSON.stringify(data) });
+  },
+  update: async (
+    id: string,
+    data: { name?: string; role?: string; is_active?: boolean; password?: string }
+  ): Promise<{ success: boolean; account: AdminAccountItem; message?: string }> => {
+    return apiRequest(`/admin/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+};
+
+// CS Link Overview Endpoints (dashboard ringkas CS)
+export const csApi = {
+  getOverview: async (ref?: string): Promise<CsOverview> => {
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return apiRequest<CsOverview>(`/cs/overview${qs}`);
   },
 };
 
@@ -648,6 +736,19 @@ export const paymentsApi = {
   },
   getBanks: async (): Promise<BankAccount[]> => {
     return apiRequest<BankAccount[]>('/payments/banks/list');
+  },
+  addBank: async (data: {
+    bank_name: string;
+    account_number: string;
+    account_name: string;
+  }): Promise<{ success: boolean; bank: BankAccount; message?: string }> => {
+    return apiRequest('/payments/banks', { method: 'POST', body: JSON.stringify(data) });
+  },
+  updateBank: async (
+    id: string,
+    data: Partial<Pick<BankAccount, 'bank_name' | 'account_number' | 'account_name' | 'is_active'>>
+  ): Promise<{ success: boolean; bank: BankAccount; message?: string }> => {
+    return apiRequest(`/payments/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   },
 };
 

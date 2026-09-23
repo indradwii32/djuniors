@@ -175,7 +175,8 @@ auth.post('/admin/login', async (c) => {
             id: admin.id,
             username: admin.username,
             name: admin.name,
-            role: admin.role
+            role: admin.role,
+            ref_code: admin.ref_code ?? null
         }
     });
 });
@@ -240,7 +241,7 @@ auth.get('/me', authMiddleware, async (c) => {
 
     if (payload.type === 'admin') {
         const admin = await c.env.DB.prepare(
-            'SELECT id, username, name, role FROM admin_accounts WHERE id = ?'
+            'SELECT id, username, name, role, ref_code FROM admin_accounts WHERE id = ?'
         ).bind(payload.userId).first();
         return c.json({ type: 'admin', ...admin });
     } else {

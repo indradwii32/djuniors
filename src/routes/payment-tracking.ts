@@ -1,35 +1,99 @@
 // ============================================
 // Djuniors - Payment Tracking Routes
 // ============================================
+// Antrian verifikasi pembayaran untuk dashboard (menu "Verifikasi Pembayaran").
+// Endpoint konfirmasi (PUT /:id/confirm) adalah JALUR TUNGGAL verifikasi:
+// update payment_tracking + sinkron status registrasi + tutup baris pending
+// lain pada registrasi yang sama + invalidasi cache.
 
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
-import { adminAuthMiddleware } from '../middleware/auth';
+import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { bumpCacheVersion } from '../middleware/cache';
+import { saveProofToR2 } from '../utils/payment';
 
 const paymentTracking = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /**
  * GET /api/payment-tracking
- * List all payment tracking records (admin)
+ * List payment tracking (admin/CS) untuk menu Verifikasi Pembayaran.
+ *
+ * Query:
+ *   status  : pending | confirmed | rejected | all (default all)
+ *   queue   : true → hanya baris yang PUNYA bukti dan masih pending
+ *             (baris awal "Registrasi baru dibuat" tanpa bukti disembunyikan)
+ *   page    : 1-indexed (default 1)
+ *   limit   : default 20, maks 100
+ *
+ * Response: { data: [...], pagination: {...} }
+ * Role CS otomatis di-scope ke pendaftaran dari link miliknya.
  */
 paymentTracking.get('/', adminAuthMiddleware, async (c) => {
     const status = c.req.query('status');
-    let query = `
-        SELECT pt.*, r.parent_name, r.parent_email, r.class_id, c.name as class_name, r.children
-        FROM payment_tracking pt
-        LEFT JOIN registrations r ON pt.registration_id = r.id OR pt.registration_number = r.registration_number
-        LEFT JOIN classes c ON r.class_id = c.id
-        WHERE 1=1
-    `;
+    const queue = c.req.query('queue') === 'true';
+    const limit = Math.min(parseInt(c.req.query('limit') || '20', 10) || 20, 100);
+    const page = Math.max(parseInt(c.req.query('page') || '1', 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    const whereParts: string[] = ['1=1'];
     const params: any[] = [];
-    if (status) {
-        query += ' AND pt.status = ?';
+
+    if (status && status !== 'all') {
+        whereParts.push('pt.status = ?');
         params.push(status);
     }
-    query += ' ORDER BY pt.created_at DESC';
-    const result = await c.env.DB.prepare(query).bind(...params).all();
-    return c.json(result.results);
+    if (queue) {
+        // Antrian verifikasi: hanya yang menunggu + punya bukti.
+        whereParts.push("pt.status = 'pending'");
+        whereParts.push("pt.proof_url IS NOT NULL AND pt.proof_url != ''");
+    }
+    // Scope role CS: hanya pendaftaran dari link miliknya.
+    if (isCSRole(c.get('jwtPayload'))) {
+        const refCode = await getStaffRefCode(c);
+        if (!refCode) {
+            return c.json({ data: [], pagination: { page: 1, limit, offset: 0, total: 0, total_pages: 1 } });
+        }
+        whereParts.push('r.ref_code = ?');
+        params.push(refCode);
+    }
+    const whereSql = whereParts.join(' AND ');
+
+    const listSql = `
+        SELECT pt.*, r.parent_name, r.parent_email, r.class_id, r.children,
+               r.ref_code, r.status AS registration_status, r.payment_status AS registration_payment_status,
+               r.bank_name, r.bank_account_number, c.name AS class_name
+        FROM payment_tracking pt
+        LEFT JOIN registrations r
+            ON (pt.registration_id = r.id OR pt.registration_number = r.registration_number)
+        LEFT JOIN classes c ON r.class_id = c.id
+        WHERE ${whereSql}
+        ORDER BY pt.created_at DESC
+        LIMIT ? OFFSET ?
+    `;
+    const countSql = `
+        SELECT COUNT(*) AS total
+        FROM payment_tracking pt
+        LEFT JOIN registrations r
+            ON (pt.registration_id = r.id OR pt.registration_number = r.registration_number)
+        WHERE ${whereSql}
+    `;
+
+    const [listRes, countRes] = await Promise.all([
+        c.env.DB.prepare(listSql).bind(...params, limit, offset).all(),
+        c.env.DB.prepare(countSql).bind(...params).all().catch(() => ({ results: [{ total: 0 }] })),
+    ]);
+
+    const total = Number((countRes.results?.[0] as any)?.total) || 0;
+    return c.json({
+        data: listRes.results || [],
+        pagination: {
+            page,
+            limit,
+            offset,
+            total,
+            total_pages: Math.ceil(total / limit) || 1,
+        },
+    });
 });
 
 /**
@@ -156,6 +220,11 @@ paymentTracking.post('/', async (c) => {
     const method = paymentMethod || (registration.payment_method as string) || 'bank_transfer';
     const phone = parentPhone || (registration.parent_phone as string);
 
+    // Data-URL base64 → R2 (konsisten dengan jalur upload di lacak.html).
+    if (proofUrl.startsWith('data:')) {
+        proofUrl = await saveProofToR2(c.env, `payment-proofs/${registrationNumber}-${Date.now()}`, proofUrl);
+    }
+
     // Create payment tracking record
     const trackingId = crypto.randomUUID();
     await c.env.DB.prepare(`
@@ -198,7 +267,7 @@ paymentTracking.post('/', async (c) => {
 
 /**
  * 3. PUT /api/payment-tracking/:id/confirm
- * Konfirmasi pembayaran (admin)
+ * Konfirmasi pembayaran (admin/CS — CS hanya untuk pendaftaran link miliknya)
  */
 paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
     const trackingId = c.req.param('id');
@@ -222,6 +291,27 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
         }, 404);
     }
 
+    // Resolusi registrasi terkait (untuk scoping CS + update sinkron).
+    let registration: any = null;
+    if (tracking.registration_id) {
+        registration = await c.env.DB.prepare(
+            'SELECT id, ref_code FROM registrations WHERE id = ?'
+        ).bind(tracking.registration_id).first();
+    }
+    if (!registration) {
+        registration = await c.env.DB.prepare(
+            'SELECT id, ref_code FROM registrations WHERE registration_number = ?'
+        ).bind(tracking.registration_number).first();
+    }
+
+    // Scope role CS: hanya pembayaran dari pendaftaran link miliknya.
+    if (isCSRole(adminPayload)) {
+        const refCode = await getStaffRefCode(c);
+        if (!refCode || !registration || (registration.ref_code as string | null) !== refCode) {
+            return c.json({ error: 'Forbidden', message: 'Hanya bisa memverifikasi pembayaran dari pendaftaran link Anda' }, 403);
+        }
+    }
+
     // Update payment_tracking
     await c.env.DB.prepare(`
         UPDATE payment_tracking SET
@@ -232,10 +322,29 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
         WHERE id = ?
     `).bind(status, confirmedBy, notes, trackingId).run();
 
+    // Tutup baris pending LAIN pada registrasi yang sama agar tidak muncul
+    // berulang di antrian verifikasi (mis. baris "Registrasi baru dibuat").
+    if (registration?.id) {
+        await c.env.DB.prepare(`
+            UPDATE payment_tracking SET
+                status = ?,
+                confirmed_by = ?,
+                confirmed_at = CURRENT_TIMESTAMP
+            WHERE registration_id = ? AND status = 'pending' AND id != ?
+        `).bind(status, confirmedBy, registration.id, trackingId).run();
+    } else {
+        await c.env.DB.prepare(`
+            UPDATE payment_tracking SET
+                status = ?,
+                confirmed_by = ?,
+                confirmed_at = CURRENT_TIMESTAMP
+            WHERE registration_number = ? AND status = 'pending' AND id != ?
+        `).bind(status, confirmedBy, tracking.registration_number, trackingId).run();
+    }
+
     // Update associated registration
-    if (tracking.registration_id) {
+    if (registration?.id) {
         const regPaymentStatus = status === 'confirmed' ? 'paid' : 'rejected';
-        const regStatus = status === 'confirmed' ? 'confirmed' : 'pending';
 
         await c.env.DB.prepare(`
             UPDATE registrations SET
@@ -243,7 +352,7 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
                 status = CASE WHEN ? = 'confirmed' THEN 'confirmed' ELSE status END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).bind(regPaymentStatus, status, tracking.registration_id).run();
+        `).bind(regPaymentStatus, status, registration.id).run();
     }
 
     // Confirmation changes what the public tracking page shows — invalidate.

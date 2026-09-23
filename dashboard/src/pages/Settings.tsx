@@ -16,9 +16,10 @@ import {
   X,
   Save,
   Lock,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { paymentsApi, notificationsApi, authApi, BankAccount } from '../utils/api';
+import { paymentsApi, notificationsApi, authApi, adminAccountsApi, BankAccount, AdminAccountItem } from '../utils/api';
 
 const DEFAULT_BANKS: BankAccount[] = [
   {
@@ -55,7 +56,7 @@ export const Settings: React.FC = () => {
   const { user } = useAuth();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'bank' | 'whatsapp' | 'profile' | 'security'>('bank');
+  const [activeTab, setActiveTab] = useState<'bank' | 'whatsapp' | 'profile' | 'security' | 'team'>('bank');
 
   // Banks State
   const [banks, setBanks] = useState<BankAccount[]>(DEFAULT_BANKS);
@@ -85,6 +86,17 @@ export const Settings: React.FC = () => {
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
+
+  // Akun Tim (admin & CS) State
+  const [accounts, setAccounts] = useState<AdminAccountItem[]>([]);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
+  const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
+  const [teamEditId, setTeamEditId] = useState<string | null>(null);
+  const [teamUsername, setTeamUsername] = useState<string>('');
+  const [teamName, setTeamName] = useState<string>('');
+  const [teamPassword, setTeamPassword] = useState<string>('');
+  const [teamRole, setTeamRole] = useState<'cs' | 'admin'>('cs');
+  const [isSavingTeam, setIsSavingTeam] = useState<boolean>(false);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -129,32 +141,122 @@ export const Settings: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleToggleBank = (id: string) => {
-    setBanks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, is_active: b.is_active ? 0 : 1 } : b))
-    );
-    showToast('Status rekening berhasil diperbarui!');
+  // Muat daftar akun tim (admin/CS) — tab Akun Tim
+  const loadAccounts = useCallback(async () => {
+    try {
+      const res = await adminAccountsApi.list();
+      if (res?.accounts) setAccounts(res.accounts);
+    } catch {
+      // non-fatal: tab Akun Tim hanya menampilkan pesan kosong
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  // Persistensi rekening ke server (sebelumnya hanya state lokal / tidak tersimpan)
+  const handleToggleBank = async (id: string) => {
+    const target = banks.find((b) => b.id === id);
+    if (!target) return;
+    const nextActive = target.is_active ? 0 : 1;
+    try {
+      await paymentsApi.updateBank(id, { is_active: nextActive });
+      setBanks((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, is_active: nextActive } : b))
+      );
+      showToast('Status rekening berhasil disimpan!');
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan status rekening', 'error');
+    }
   };
 
-  const handleAddBank = (e: React.FormEvent) => {
+  const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAccountNumber.trim()) {
       showToast('Nomor rekening harus diisi', 'error');
       return;
     }
 
-    const newBank: BankAccount = {
-      id: `bank-${Date.now().toString().slice(-4)}`,
-      bank_name: newBankName,
-      account_number: newAccountNumber.trim(),
-      account_name: newAccountName.trim() || 'Wahyu Adi Syahputra',
-      is_active: 1,
-    };
+    try {
+      setIsSaving(true);
+      const res = await paymentsApi.addBank({
+        bank_name: newBankName.trim(),
+        account_number: newAccountNumber.trim(),
+        account_name: newAccountName.trim() || 'Wahyu Adi Syahputra',
+      });
+      if (res?.bank) {
+        setBanks((prev) => [...prev, res.bank]);
+      }
+      showToast('Rekening pembayaran baru berhasil ditambahkan!');
+      setIsAddBankModalOpen(false);
+      setNewAccountNumber('');
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menambahkan rekening', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    setBanks((prev) => [...prev, newBank]);
-    showToast('Rekening pembayaran baru berhasil ditambahkan!');
-    setIsAddBankModalOpen(false);
-    setNewAccountNumber('');
+  // --- Akun Tim: buat / edit / aktif-nonaktif ---
+  const openCreateTeam = () => {
+    setTeamModalMode('create');
+    setTeamEditId(null);
+    setTeamUsername('');
+    setTeamName('');
+    setTeamPassword('');
+    setTeamRole('cs');
+    setIsTeamModalOpen(true);
+  };
+
+  const openEditTeam = (acc: AdminAccountItem) => {
+    setTeamModalMode('edit');
+    setTeamEditId(acc.id);
+    setTeamUsername(acc.username);
+    setTeamName(acc.name);
+    setTeamPassword('');
+    setTeamRole(acc.role === 'admin' || acc.role === 'super_admin' ? 'admin' : 'cs');
+    setIsTeamModalOpen(true);
+  };
+
+  const handleSubmitTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSavingTeam(true);
+      if (teamModalMode === 'create') {
+        const res = await adminAccountsApi.create({
+          username: teamUsername.trim(),
+          name: teamName.trim(),
+          password: teamPassword,
+          role: teamRole,
+        });
+        showToast(res?.message || 'Akun berhasil dibuat');
+      } else {
+        const payload: { name: string; role: string; password?: string } = {
+          name: teamName.trim(),
+          role: teamRole,
+        };
+        if (teamPassword) payload.password = teamPassword;
+        await adminAccountsApi.update(teamEditId!, payload);
+        showToast('Akun berhasil diperbarui');
+      }
+      setIsTeamModalOpen(false);
+      await loadAccounts();
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan akun', 'error');
+    } finally {
+      setIsSavingTeam(false);
+    }
+  };
+
+  const handleToggleAccount = async (acc: AdminAccountItem) => {
+    try {
+      await adminAccountsApi.update(acc.id, { is_active: !acc.is_active });
+      showToast('Status akun diperbarui');
+      await loadAccounts();
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal mengubah status akun', 'error');
+    }
   };
 
   const handleSaveWaToken = async () => {
@@ -415,6 +517,28 @@ export const Settings: React.FC = () => {
         >
           <Lock size={18} />
           <span>Keamanan Admin</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('team')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            backgroundColor: activeTab === 'team' ? '#4A90D9' : '#FFFFFF',
+            color: activeTab === 'team' ? '#FFFFFF' : '#475569',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            boxShadow: activeTab === 'team' ? '0 4px 12px rgba(74, 144, 217, 0.3)' : 'none',
+            transition: 'all 0.2s',
+          }}
+        >
+          <Users size={18} />
+          <span>Akun Tim (CS)</span>
         </button>
       </div>
 
@@ -895,6 +1019,185 @@ export const Settings: React.FC = () => {
         </div>
       )}
 
+      {/* Tab 5: Akun Tim (admin & CS) */}
+      {activeTab === 'team' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1px solid #E2E8F0',
+              padding: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '1rem',
+            }}
+          >
+            <div>
+              <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.25rem', margin: '0 0 4px 0', color: '#1E293B' }}>
+                Akun Tim Dashboard
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B' }}>
+                Buat akun <strong>CS</strong> (hanya bisa mengelola pendaftaran dari link miliknya) atau akun <strong>Admin</strong> baru.
+                Setiap CS otomatis mendapat kode link pendaftaran sendiri.
+              </p>
+            </div>
+            <button
+              onClick={openCreateTeam}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0.65rem 1.25rem',
+                borderRadius: '10px',
+                border: 'none',
+                backgroundColor: '#4A90D9',
+                color: '#FFFFFF',
+                fontSize: '0.875rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={16} />
+              <span>Tambah Akun</span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ overflowX: 'auto' }} className="table-responsive">
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>USERNAME</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>NAMA</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>ROLE</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>KODE LINK</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>PENDAFTARAN</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>STATUS</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textAlign: 'right' }}>AKSI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94A3B8' }}>
+                        Belum ada data akun. Klik "Tambah Akun" untuk membuat akun CS.
+                      </td>
+                    </tr>
+                  ) : (
+                    accounts.map((acc) => {
+                      const isActive = Boolean(acc.is_active);
+                      const roleLabel = acc.role === 'super_admin' ? 'Super Admin' : acc.role === 'admin' ? 'Admin' : 'CS';
+                      const isSelf = acc.id === user?.id;
+                      return (
+                        <tr key={acc.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '1rem 1.25rem', fontFamily: 'monospace', fontWeight: 700, color: '#1E293B', fontSize: '0.875rem' }}>
+                            @{acc.username}
+                          </td>
+                          <td style={{ padding: '1rem 1.25rem', fontWeight: 700, color: '#1E293B' }}>{acc.name}</td>
+                          <td style={{ padding: '1rem 1.25rem' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                backgroundColor: acc.role === 'cs' ? '#F5F3FF' : acc.role === 'super_admin' ? '#FEF3C7' : '#EFF6FF',
+                                color: acc.role === 'cs' ? '#6D28D9' : acc.role === 'super_admin' ? '#B45309' : '#1D4ED8',
+                              }}
+                            >
+                              {roleLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem 1.25rem', fontFamily: 'monospace', fontWeight: 700, color: '#6D28D9', fontSize: '0.85rem' }}>
+                            {acc.ref_code || '-'}
+                          </td>
+                          <td style={{ padding: '1rem 1.25rem', fontSize: '0.85rem', color: '#475569' }}>
+                            {acc.ref_code ? (
+                              <>
+                                <strong style={{ color: '#1E293B' }}>{Number(acc.reg_total) || 0}</strong> masuk ·{' '}
+                                <strong style={{ color: '#059669' }}>{Number(acc.reg_paid) || 0}</strong> lunas
+                              </>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem 1.25rem' }}>
+                            <span
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                backgroundColor: isActive ? '#DCFCE7' : '#F1F5F9',
+                                color: isActive ? '#15803D' : '#64748B',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: isActive ? '#22C55E' : '#94A3B8' }} />
+                              <span>{isActive ? 'Aktif' : 'Nonaktif'}</span>
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem 1.25rem', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button
+                                className="btn-touch-sm"
+                                onClick={() => openEditTeam(acc)}
+                                style={{
+                                  padding: '7px 12px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #CBD5E1',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#334155',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Edit / Reset PW
+                              </button>
+                              {!isSelf && (
+                                <button
+                                  className="btn-touch-sm"
+                                  onClick={() => handleToggleAccount(acc)}
+                                  style={{
+                                    padding: '7px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #FECACA',
+                                    backgroundColor: isActive ? '#FEF2F2' : '#F0FDF4',
+                                    color: isActive ? '#DC2626' : '#15803D',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  {isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: Tambah Rekening Bank */}
       {isAddBankModalOpen && (
         <div
@@ -995,6 +1298,154 @@ export const Settings: React.FC = () => {
                   style={{ padding: '0.65rem 1.5rem', borderRadius: '8px', border: 'none', backgroundColor: '#4A90D9', color: '#FFFFFF', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Simpan Rekening
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Tambah / Edit Akun Tim */}
+      {isTeamModalOpen && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="modal-content modal-responsive"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '1.75rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={20} color="#4A90D9" />
+                <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.3rem', fontWeight: 700, margin: 0, color: '#1E293B' }}>
+                  {teamModalMode === 'create' ? 'Tambah Akun Tim' : 'Edit Akun Tim'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsTeamModalOpen(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTeam} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                  Role *
+                </label>
+                <select
+                  value={teamRole}
+                  onChange={(e) => setTeamRole(e.target.value as 'cs' | 'admin')}
+                  disabled={teamModalMode === 'edit' && user?.role !== 'super_admin'}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                    fontWeight: 600,
+                  }}
+                >
+                  <option value="cs">CS — hanya kelola pendaftaran dari link-nya</option>
+                  <option value="admin">Admin — akses penuh</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                  Username *
+                </label>
+                <input
+                  type="text"
+                  required
+                  disabled={teamModalMode === 'edit'}
+                  value={teamUsername}
+                  onChange={(e) => setTeamUsername(e.target.value.toLowerCase())}
+                  placeholder="Contoh: cs01"
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    outline: 'none',
+                    opacity: teamModalMode === 'edit' ? 0.6 : 1,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                  Nama Lengkap *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="Contoh: Rina (CS)"
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                  Password {teamModalMode === 'create' ? '*' : '(kosongkan jika tidak diganti)'}
+                </label>
+                <input
+                  type="text"
+                  required={teamModalMode === 'create'}
+                  value={teamPassword}
+                  onChange={(e) => setTeamPassword(e.target.value)}
+                  placeholder={teamModalMode === 'create' ? 'Minimal 6 karakter' : 'Isi hanya untuk ganti password'}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsTeamModalOpen(false)}
+                  style={{ padding: '0.65rem 1.25rem', borderRadius: '8px', border: '1px solid #CBD5E1', backgroundColor: '#FFFFFF', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingTeam}
+                  style={{
+                    padding: '0.65rem 1.5rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#4A90D9',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    cursor: isSavingTeam ? 'not-allowed' : 'pointer',
+                    opacity: isSavingTeam ? 0.7 : 1,
+                  }}
+                >
+                  {isSavingTeam ? 'Menyimpan...' : teamModalMode === 'create' ? 'Buat Akun' : 'Simpan Perubahan'}
                 </button>
               </div>
             </form>

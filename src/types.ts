@@ -95,6 +95,12 @@ export interface Registration {
     status: 'pending' | 'confirmed' | 'rejected';
     payment_status: 'unpaid' | 'paid' | 'rejected';
     notes?: string;
+    // Sumber link CS (registrasi datang dari ?ref=KODE)
+    ref_code?: string | null;
+    // Snapshot rekening bank yang dipilih pendaftar di step terakhir
+    bank_account_id?: string | null;
+    bank_name?: string | null;
+    bank_account_number?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -157,7 +163,9 @@ export interface AdminAccount {
     username: string;
     password_hash: string;
     name: string;
-    role: 'admin' | 'super_admin';
+    role: 'admin' | 'super_admin' | 'cs';
+    // Kode unik untuk link pendaftaran CS (?ref=KODE). Hanya diisi untuk akun CS.
+    ref_code?: string | null;
     is_active: boolean;
     last_login?: string;
     created_at: string;

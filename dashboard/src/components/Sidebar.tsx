@@ -20,6 +20,8 @@ import {
   Settings,
   ChevronDown,
   GraduationCap,
+  ClipboardCheck,
+  Link2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -43,7 +45,7 @@ interface MenuItem {
   children?: SubMenuItem[];
 }
 
-const menuItems: MenuItem[] = [
+const adminMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
     path: '/',
@@ -63,7 +65,13 @@ const menuItems: MenuItem[] = [
     children: [
       { path: '/registrations', label: 'Pendaftaran Baru', icon: UserCheck },
       { path: '/participants', label: 'Data Peserta', icon: Users },
+      { path: '/verifikasi', label: 'Verifikasi Pembayaran', icon: ClipboardCheck },
     ],
+  },
+  {
+    label: 'Link & Tracking CS',
+    path: '/cs-links',
+    icon: Link2,
   },
   {
     label: 'Promo & Diskon',
@@ -90,10 +98,39 @@ const menuItems: MenuItem[] = [
   },
 ];
 
+// Menu khusus role CS: hanya Dashboard ringkas, Pendaftaran (miliknya),
+// Verifikasi Pembayaran (miliknya), dan Link Kelas Saya.
+const csMenuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    path: '/',
+    icon: LayoutDashboard,
+  },
+  {
+    label: 'Pendaftaran Baru',
+    path: '/registrations',
+    icon: UserCheck,
+  },
+  {
+    label: 'Verifikasi Pembayaran',
+    path: '/verifikasi',
+    icon: ClipboardCheck,
+  },
+  {
+    label: 'Link Kelas Saya',
+    path: '/cs-links',
+    icon: Link2,
+  },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Menu mengikuti role: CS hanya melihat modul pendaftaran miliknya.
+  const isCS = user?.role === 'cs';
+  const menuItems: MenuItem[] = isCS ? csMenuItems : adminMenuItems;
 
   // Track expanded state for menu sections
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});

@@ -73,3 +73,46 @@ export function validatePaymentAmount(
 ): boolean {
     return Math.abs(expectedAmount - receivedAmount) <= tolerance;
 }
+
+/**
+ * Simpan bukti bayar ke R2.
+ *
+ * Halaman lacak mengirim bukti sebagai data-URL base64 (JSON). Menyimpannya
+ * mentah-mentah ke D1 membesar-besarkan baris & tidak bisa di-cache, jadi
+ * kita konversi ke object R2 dan kembalikan URL publik `/api/files/...`.
+ *
+ * Bila `proofUrl` bukan data-URL (mis. sudah URL) atau R2 tidak tersedia,
+ * nilai asli dikembalikan apa adanya.
+ */
+export async function saveProofToR2(
+    env: { R2?: R2Bucket },
+    keyBase: string,
+    proofUrl: string
+): Promise<string> {
+    if (!proofUrl || !proofUrl.startsWith('data:') || !env.R2) {
+        return proofUrl;
+    }
+    try {
+        const match = proofUrl.match(/^data:([^;,]+)(;base64)?,([\s\S]*)$/);
+        if (!match) return proofUrl;
+        const mime = match[1] || 'image/jpeg';
+        const isBase64 = Boolean(match[2]);
+        const payload = match[3];
+        const ext = mime.includes('png') ? 'png'
+            : mime.includes('webp') ? 'webp'
+            : mime.includes('gif') ? 'gif'
+            : 'jpg';
+        const bytes = isBase64
+            ? Uint8Array.from(atob(payload), (ch) => ch.charCodeAt(0))
+            : new TextEncoder().encode(decodeURIComponent(payload));
+        const key = `${keyBase}.${ext}`;
+        await env.R2.put(key, bytes.buffer as ArrayBuffer, {
+            httpMetadata: { contentType: mime },
+        });
+        return `/api/files/${key}`;
+    } catch (err) {
+        // Fallback: simpan data-URL asli agar upload tetap berhasil.
+        console.warn('[proof] R2 save failed:', (err as Error).message);
+        return proofUrl;
+    }
+}

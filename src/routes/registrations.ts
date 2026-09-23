@@ -4,8 +4,9 @@
 
 import { Hono } from 'hono';
 import { Bindings, Variables, Registration, RegistrationChild } from '../types';
-import { adminAuthMiddleware } from '../middleware/auth';
+import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
+import { saveProofToR2 } from '../utils/payment';
 
 const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Public tracking reads are cached for 60s — long enough to absorb repeated
@@ -62,7 +63,9 @@ registrations.post('/', async (c) => {
         children,
         promo_code,
         payment_method,
-        notes
+        notes,
+        ref_code,
+        bank_account_id
     } = body;
 
     // Validate required fields
@@ -178,13 +181,39 @@ registrations.post('/', async (c) => {
     const id = crypto.randomUUID();
     const method = payment_method || 'bank_transfer';
 
+    // Sumber link CS (?ref=) — simpan hanya bila kode terdaftar & aktif.
+    let storedRefCode: string | null = null;
+    if (ref_code && typeof ref_code === 'string') {
+        const refRow = await c.env.DB.prepare(
+            'SELECT ref_code FROM admin_accounts WHERE UPPER(ref_code) = UPPER(?) AND is_active = 1'
+        ).bind(ref_code.trim()).first();
+        if (refRow?.ref_code) storedRefCode = refRow.ref_code as string;
+    }
+
+    // Snapshot rekening bank yang dipilih pendaftar di step terakhir —
+    // diverifikasi server-side ke tabel bank_accounts (tidak dipercaya dari client).
+    let bankAccountId: string | null = null;
+    let bankName: string | null = null;
+    let bankNumber: string | null = null;
+    if (bank_account_id && typeof bank_account_id === 'string') {
+        const bank = await c.env.DB.prepare(
+            'SELECT id, bank_name, account_number FROM bank_accounts WHERE id = ? AND is_active = 1'
+        ).bind(bank_account_id).first();
+        if (bank) {
+            bankAccountId = bank.id as string;
+            bankName = bank.bank_name as string;
+            bankNumber = bank.account_number as string;
+        }
+    }
+
     // Insert registration
     await c.env.DB.prepare(`
         INSERT INTO registrations (
             id, registration_number, parent_name, parent_phone, parent_email, parent_city,
             class_id, schedule_slot, children, total_amount, discount_amount, final_amount,
-            promo_code, payment_method, status, payment_status, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?)
+            promo_code, payment_method, status, payment_status, notes,
+            ref_code, bank_account_id, bank_name, bank_account_number
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?)
     `).bind(
         id,
         registrationNumber,
@@ -200,7 +229,11 @@ registrations.post('/', async (c) => {
         finalAmount,
         appliedPromoCode,
         method,
-        notes || null
+        notes || null,
+        storedRefCode,
+        bankAccountId,
+        bankName,
+        bankNumber
     ).run();
 
     // Create initial payment tracking record
@@ -245,7 +278,10 @@ registrations.post('/', async (c) => {
             payment_method: method,
             status: 'pending',
             payment_status: 'unpaid',
-            notes: notes || null
+            notes: notes || null,
+            ref_code: storedRefCode,
+            bank_name: bankName,
+            bank_account_number: bankNumber
         },
         message: 'Registrasi berhasil dibuat'
     }, 201);
@@ -305,8 +341,13 @@ registrations.get('/', adminAuthMiddleware, async (c) => {
         r.final_amount,
         r.promo_code,
         r.payment_method,
+        r.payment_proof_url,
         r.status,
         r.payment_status,
+        r.notes,
+        r.ref_code,
+        r.bank_name,
+        r.bank_account_number,
         r.created_at,
         r.updated_at,
         c.name as class_name,
@@ -327,6 +368,18 @@ registrations.get('/', adminAuthMiddleware, async (c) => {
             // In progress: not yet confirmed, not yet paid, or rejected mid-flow.
             whereParts.push("NOT (r.status = 'confirmed' AND r.payment_status = 'paid')");
         }
+    }
+    // Scope role CS: hanya pendaftaran yang datang dari link miliknya.
+    if (isCSRole(c.get('jwtPayload'))) {
+        const refCode = await getStaffRefCode(c);
+        if (!refCode) {
+            return c.json({
+                data: [],
+                pagination: { page: 1, limit, offset: 0, total: 0, total_pages: 1 },
+            });
+        }
+        whereParts.push('r.ref_code = ?');
+        whereParams.push(refCode);
     }
     if (search) {
         const sw = `%${search}%`;
@@ -431,9 +484,10 @@ registrations.get('/track/phone/:phone', trackCache, async (c) => {
 
 /**
  * 3. GET /api/registrations/:id
- * Detail by ID
+ * Detail by ID — butuh login dashboard (adminAuth). Data publik tetap
+ * tersedia lewat /track/:number bagi yang tahu nomor registrasi.
  */
-registrations.get('/:id', trackCache, async (c) => {
+registrations.get('/:id', adminAuthMiddleware, async (c) => {
     const id = c.req.param('id');
 
     const result = await c.env.DB.prepare(`
@@ -445,6 +499,14 @@ registrations.get('/:id', trackCache, async (c) => {
 
     if (!result) {
         return c.json({ error: 'Registration not found' }, 404);
+    }
+
+    // Scope role CS: hanya boleh melihat pendaftaran dari link miliknya.
+    if (isCSRole(c.get('jwtPayload'))) {
+        const refCode = await getStaffRefCode(c);
+        if (!refCode || (result.ref_code as string | null) !== refCode) {
+            return c.json({ error: 'Forbidden', message: 'Hanya bisa melihat pendaftaran dari link Anda' }, 403);
+        }
     }
 
     const trackingList = await c.env.DB.prepare(`
@@ -476,6 +538,14 @@ registrations.put('/:id/status', adminAuthMiddleware, async (c) => {
 
     if (!existing) {
         return c.json({ error: 'Registration not found' }, 404);
+    }
+
+    // Scope role CS: hanya boleh mengelola pendaftaran dari link miliknya.
+    if (isCSRole(c.get('jwtPayload'))) {
+        const refCode = await getStaffRefCode(c);
+        if (!refCode || (existing.ref_code as string | null) !== refCode) {
+            return c.json({ error: 'Forbidden', message: 'Hanya bisa mengelola pendaftaran dari link Anda' }, 403);
+        }
     }
 
     await c.env.DB.prepare(`
@@ -560,6 +630,12 @@ registrations.post('/:id/payment', async (c) => {
 
     if (!proofUrl) {
         return c.json({ error: 'Missing payment proof', message: 'proof_url atau file bukti bayar diperlukan' }, 400);
+    }
+
+    // Bukti berupa data-URL base64 (dari halaman lacak) → simpan ke R2 agar
+    // ringkas & bisa di-cache; selain itu diterima apa adanya.
+    if (proofUrl.startsWith('data:')) {
+        proofUrl = await saveProofToR2(c.env, `payment-proofs/${id}-${Date.now()}`, proofUrl);
     }
 
     // Update registration with payment proof

@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS registrations (
     status TEXT DEFAULT 'pending', -- pending, confirmed, rejected
     payment_status TEXT DEFAULT 'unpaid', -- unpaid, paid, rejected
     notes TEXT,
+    -- Sumber link CS (?ref=KODE) + snapshot rekening yang dipilih pendaftar
+    ref_code TEXT,
+    bank_account_id TEXT,
+    bank_name TEXT,
+    bank_account_number TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -126,7 +131,8 @@ CREATE TABLE IF NOT EXISTS admin_accounts (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
-    role TEXT DEFAULT 'admin',
+    role TEXT DEFAULT 'admin', -- 'super_admin', 'admin', 'cs'
+    ref_code TEXT, -- kode unik link CS (?ref=); hanya untuk role 'cs'
     is_active BOOLEAN DEFAULT 1,
     last_login DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -233,6 +239,8 @@ CREATE INDEX IF NOT EXISTS idx_registrations_phone           ON registrations(pa
 -- index makes the intent obvious to readers and keeps the index list here.
 CREATE INDEX IF NOT EXISTS idx_registrations_number          ON registrations(registration_number);
 CREATE INDEX IF NOT EXISTS idx_registrations_created_at      ON registrations(created_at DESC);
+-- Link CS tracking (menu Link & Tracking CS + scoping data per-CS)
+CREATE INDEX IF NOT EXISTS idx_registrations_ref_code        ON registrations(ref_code);
 
 -- Payment tracking: lookup by registration number is the public tracking flow
 CREATE INDEX IF NOT EXISTS idx_payment_tracking_number       ON payment_tracking(registration_number);

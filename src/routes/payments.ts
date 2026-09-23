@@ -214,4 +214,62 @@ payments.get('/banks/list', async (c) => {
     return c.json(banks);
 });
 
+// ============================================
+// Manajemen rekening bank (admin) — menu Pengaturan Sistem → Rekening
+// Sebelumnya UI Settings hanya mengubah state lokal (tidak pernah tersimpan);
+// endpoint ini membuat tambahan / edit / aktif-nonaktif benar-benar persist.
+// ============================================
+
+// Create bank account (admin)
+payments.post('/banks', adminAuthMiddleware, async (c) => {
+    const body = await c.req.json();
+    const bankName = (body.bank_name || '').trim();
+    const accountNumber = (body.account_number || '').trim();
+    const accountName = (body.account_name || '').trim();
+
+    if (!bankName || !accountNumber || !accountName) {
+        return c.json({
+            error: 'Missing fields',
+            message: 'Nama bank, nomor rekening, dan nama pemilik wajib diisi'
+        }, 400);
+    }
+
+    const id = crypto.randomUUID();
+    await c.env.DB.prepare(`
+        INSERT INTO bank_accounts (id, bank_name, account_number, account_name, is_active)
+        VALUES (?, ?, ?, ?, 1)
+    `).bind(id, bankName, accountNumber, accountName).run();
+
+    const created = await c.env.DB.prepare('SELECT * FROM bank_accounts WHERE id = ?').bind(id).first();
+    return c.json({ success: true, bank: created, message: 'Rekening berhasil ditambahkan' }, 201);
+});
+
+// Update bank account (admin) — edit field & toggle aktif
+payments.put('/banks/:id', adminAuthMiddleware, async (c) => {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+
+    const existing = await c.env.DB.prepare('SELECT * FROM bank_accounts WHERE id = ?').bind(id).first();
+    if (!existing) {
+        return c.json({ error: 'Not found', message: 'Rekening tidak ditemukan' }, 404);
+    }
+
+    const bankName = body.bank_name !== undefined ? String(body.bank_name).trim() : (existing.bank_name as string);
+    const accountNumber = body.account_number !== undefined ? String(body.account_number).trim() : (existing.account_number as string);
+    const accountName = body.account_name !== undefined ? String(body.account_name).trim() : (existing.account_name as string);
+    const isActive = body.is_active !== undefined ? (body.is_active ? 1 : 0) : (existing.is_active ? 1 : 0);
+
+    if (!bankName || !accountNumber || !accountName) {
+        return c.json({ error: 'Invalid', message: 'Nama bank, nomor rekening, dan nama pemilik tidak boleh kosong' }, 400);
+    }
+
+    await c.env.DB.prepare(`
+        UPDATE bank_accounts SET bank_name = ?, account_number = ?, account_name = ?, is_active = ?
+        WHERE id = ?
+    `).bind(bankName, accountNumber, accountName, isActive, id).run();
+
+    const updated = await c.env.DB.prepare('SELECT * FROM bank_accounts WHERE id = ?').bind(id).first();
+    return c.json({ success: true, bank: updated, message: 'Rekening berhasil diperbarui' });
+});
+
 export default payments;

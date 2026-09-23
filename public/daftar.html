@@ -287,6 +287,16 @@
                                         Mendukung transfer saldo DANA Wallet ke nomor: <strong>081252218206</strong> (a.n. Wahyu Adi Syahputra).
                                     </div>
                                 </div>
+
+                                <!-- Ringkasan rekening terpilih — tampil di step terakhir,
+                                     tepat sebelum tombol konfirmasi pendaftaran (diisi JS) -->
+                                <div class="payment-details-box" id="selected-bank-summary" style="display: none; border-color: #FF6B35; background: #FFF9F5;">
+                                    <div style="font-size: 0.78rem; font-weight: 800; color: #FF6B35; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">
+                                        🏦 Rekening Tujuan Transfer (terpilih)
+                                    </div>
+                                    <div id="selected-bank-main" style="margin-bottom: 0.6rem;"></div>
+                                    <button type="button" class="btn-copy" id="selected-bank-copy" data-copy="">Salin Nomor Rekening</button>
+                                </div>
                             </div>
 
                             <!-- Optional Notes -->
@@ -355,6 +365,6 @@
         </div>
     </div>
 
-    <script src="js/registration.js?v=20260902"></script>
+    <script src="js/registration.js?v=20260923"></script>
 </body>
 </html>

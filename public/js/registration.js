@@ -14,6 +14,10 @@ class DjuniorsRegistration {
         this.selectedSlot = null;
         this.selectedPaymentMethod = 'bank_transfer';
 
+        // Rekening bank — diambil dari API (bukan hardcoded), bisa dipilih
+        this.banks = [];
+        this.selectedBank = null;
+
         this.children = [
             { name: '', age_or_class: '' }
         ];
@@ -29,13 +33,16 @@ class DjuniorsRegistration {
         const urlParams = new URLSearchParams(window.location.search);
         this.initialClassId = urlParams.get('class') || urlParams.get('class_id');
         this.initialLevelId = urlParams.get('level') || urlParams.get('level_id');
+        // Sumber link CS: ?ref=KODE — dikirim saat submit agar pendaftaran
+        // tercatat sebagai milik CS bersangkutan.
+        this.refCode = urlParams.get('ref') || urlParams.get('ref_code') || null;
 
         this.init();
     }
 
     async init() {
         this.bindEvents();
-        await this.fetchClasses();
+        await Promise.all([this.fetchClasses(), this.fetchBanks()]);
     }
 
     bindEvents() {
@@ -163,6 +170,127 @@ class DjuniorsRegistration {
                 container.innerHTML = '<p class="form-info" style="grid-column: 1/-1;">Gagal memuat pilihan kelas. Silakan muat ulang halaman.</p>';
             }
         }
+    }
+
+    /**
+     * Ambil daftar rekening aktif dari database (API /payments/banks/list).
+     * Bila gagal/kosong, HTML statis di daftar.html dipertahankan sebagai fallback.
+     */
+    async fetchBanks() {
+        try {
+            const response = await fetch(`${API_BASE}/api/payments/banks/list`);
+            if (!response.ok) throw new Error('Gagal mengambil data rekening');
+            const data = await response.json();
+            if (Array.isArray(data) && data.length > 0) {
+                this.banks = data;
+                this.renderBanks();
+            }
+        } catch (error) {
+            console.warn('Bank list tidak tersedia, memakai data statis:', error);
+        }
+    }
+
+    /**
+     * Render kartu rekening yang bisa dipilih di step 4
+     */
+    renderBanks() {
+        const container = document.getElementById('bank-transfer-details');
+        if (!container || !Array.isArray(this.banks) || this.banks.length === 0) return;
+
+        const holder = this.banks[0].account_name || 'Wahyu Adi Syahputra';
+        container.innerHTML = `
+            <div style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.75rem;">
+                Silakan transfer ke salah satu rekening resmi D&rsquo;Juniors (a.n. ${this.escapeHtml(holder)}) — <em>klik untuk memilih rekening tujuan</em>:
+            </div>
+            <div class="bank-options" id="bank-options">
+                ${this.banks.map((bank) => `
+                    <div class="bank-option" data-bank-id="${this.escapeHtml(bank.id)}" style="cursor: pointer;">
+                        <div class="bank-account-card" data-bank-card="${this.escapeHtml(bank.id)}" style="transition: all 0.15s ease; border: 2px solid #E2E8F0;">
+                            <div>
+                                <div class="bank-info-name">${this.escapeHtml(bank.bank_name)}</div>
+                                <div class="bank-info-number">${this.escapeHtml(bank.account_number)}</div>
+                                <div class="bank-info-holder">a.n. ${this.escapeHtml(bank.account_name)}</div>
+                            </div>
+                            <button type="button" class="btn-copy" data-copy="${this.escapeHtml(bank.account_number)}">Salin Rekening</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        container.querySelectorAll('.bank-option').forEach((opt) => {
+            opt.addEventListener('click', (e) => {
+                // Klik tombol salin tidak ikut mengubah pilihan
+                if (e.target && e.target.classList && e.target.classList.contains('btn-copy')) return;
+                this.selectBank(opt.dataset.bankId);
+            });
+        });
+
+        // Tombol salin dinamis (tombol statis sudah di-bind di bindEvents)
+        container.querySelectorAll('.btn-copy').forEach((btn) => {
+            if (btn.dataset.bound === '1') return;
+            btn.dataset.bound = '1';
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const textToCopy = btn.dataset.copy;
+                if (!textToCopy) return;
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalText = btn.textContent;
+                    btn.textContent = '✓ Tersalin!';
+                    setTimeout(() => { btn.textContent = originalText; }, 2000);
+                });
+            });
+        });
+
+        // Default: rekening pertama langsung terpilih
+        this.selectBank(this.banks[0].id);
+    }
+
+    /**
+     * Pilih rekening tujuan + tampilkan ringkasan di step terakhir
+     * (tepat sebelum tombol konfirmasi/kirim pendaftaran).
+     */
+    selectBank(bankId) {
+        const bank = this.banks.find((b) => b.id === bankId);
+        if (!bank) return;
+        this.selectedBank = bank;
+
+        document.querySelectorAll('[data-bank-card]').forEach((card) => {
+            const active = card.getAttribute('data-bank-card') === bankId;
+            card.style.borderColor = active ? '#FF6B35' : '#E2E8F0';
+            card.style.boxShadow = active ? '0 4px 14px rgba(255, 107, 53, 0.25)' : 'none';
+            card.style.backgroundColor = active ? '#FFF9F5' : '#FFFFFF';
+        });
+
+        this.updateSelectedBankSummary();
+    }
+
+    /**
+     * Update box "Rekening Tujuan Transfer (terpilih)" — hanya untuk metode
+     * bank transfer; disembunyikan untuk QRIS / E-Wallet.
+     */
+    updateSelectedBankSummary() {
+        const box = document.getElementById('selected-bank-summary');
+        const main = document.getElementById('selected-bank-main');
+        if (!box || !main) return;
+
+        if (!this.selectedBank || this.selectedPaymentMethod !== 'bank_transfer') {
+            box.style.display = 'none';
+            return;
+        }
+
+        main.innerHTML = `
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;">
+                <span style="font-weight: 800; color: #1E293B; font-size: 1rem;">${this.escapeHtml(this.selectedBank.bank_name)}</span>
+                <span style="font-family: monospace; font-size: 1.2rem; font-weight: 800; color: #FF6B35; letter-spacing: 1.5px;">${this.escapeHtml(this.selectedBank.account_number)}</span>
+            </div>
+            <div style="font-size: 0.82rem; color: #64748b;">a.n. ${this.escapeHtml(this.selectedBank.account_name)}</div>
+        `;
+
+        const copyBtn = document.getElementById('selected-bank-copy');
+        if (copyBtn) copyBtn.setAttribute('data-copy', this.selectedBank.account_number);
+
+        box.style.display = 'block';
     }
 
     /**
@@ -486,6 +614,9 @@ class DjuniorsRegistration {
         if (bankDetails) bankDetails.classList.toggle('hidden', method !== 'bank_transfer');
         if (qrisDetails) qrisDetails.classList.toggle('hidden', method !== 'qris');
         if (ewalletDetails) ewalletDetails.classList.toggle('hidden', method !== 'ewallet');
+
+        // Ringkasan rekening terpilih hanya relevan untuk transfer bank
+        this.updateSelectedBankSummary();
     }
 
     /**
@@ -519,6 +650,8 @@ class DjuniorsRegistration {
         }
 
         this.recalculatePrice();
+        // Pastikan ringkasan rekening terpilih tampil di step terakhir
+        this.updateSelectedBankSummary();
     }
 
     /**
@@ -681,7 +814,14 @@ class DjuniorsRegistration {
             children: this.children,
             promo_code: this.promo.applied ? this.promo.code : null,
             payment_method: this.selectedPaymentMethod,
-            notes: notes
+            notes: notes,
+            // Sumber link CS (?ref=) — dikosongkan bila akses langsung
+            ref_code: this.refCode || null,
+            // Rekening terpilih di step terakhir (divalidasi server-side)
+            bank_account_id:
+                this.selectedPaymentMethod === 'bank_transfer' && this.selectedBank
+                    ? this.selectedBank.id
+                    : null
         };
 
         try {

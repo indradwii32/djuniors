@@ -35,6 +35,7 @@ import {
 } from 'recharts';
 import StatsCard from '../components/StatsCard';
 import UsageGauge from '../components/UsageGauge';
+import CSDashboard from '../components/CSDashboard';
 import { useAuth } from '../contexts/AuthContext';
 import {
   dashboardApi,
@@ -53,7 +54,7 @@ import {
 // Colors for Pie Chart
 const LEVEL_COLORS = ['#4A90D9', '#FFD93D', '#FF6B35', '#6BCB77', '#FF9CEE', '#A78BFA'];
 
-export const Dashboard: React.FC = () => {
+const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -1029,6 +1030,16 @@ export const Dashboard: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  // Role CS mendapatkan dashboard ringkas miliknya (statistik link sendiri);
+  // admin/super_admin melihat dashboard analitik lengkap (AdminDashboard).
+  if (user?.role === 'cs') {
+    return <CSDashboard />;
+  }
+  return <AdminDashboard />;
 };
 
 export default Dashboard;
