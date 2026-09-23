@@ -99,7 +99,8 @@ const adminMenuItems: MenuItem[] = [
 ];
 
 // Menu khusus role CS: hanya Dashboard ringkas, Pendaftaran (miliknya),
-// Verifikasi Pembayaran (miliknya), dan Link Kelas Saya.
+// Verifikasi Pembayaran (miliknya), Link Kelas Saya, dan setelan notifikasi
+// WhatsApp miliknya sendiri.
 const csMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
@@ -120,6 +121,11 @@ const csMenuItems: MenuItem[] = [
     label: 'Link Kelas Saya',
     path: '/cs-links',
     icon: Link2,
+  },
+  {
+    label: 'Notifikasi WA',
+    path: '/notifications',
+    icon: MessageSquare,
   },
 ];
 

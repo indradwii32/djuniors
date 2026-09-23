@@ -2,12 +2,65 @@
 // Djuniors Dashboard - Layout Component
 // ============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+
+/**
+ * Skeleton area konten saat chunk halaman sedang diunduh.
+ * Sengaja hanya menutupi area konten — sidebar & header tetap terlihat agar
+ * perpindahan menu tidak terasa seperti layar putih kosong.
+ */
+const PageSkeleton: React.FC = () => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        color: '#64748B',
+        fontWeight: 700,
+        fontSize: '0.9rem',
+      }}
+    >
+      <Loader2 size={18} className="animate-spin" color="#4A90D9" />
+      <span>Memuat halaman…</span>
+    </div>
+    <div
+      style={{
+        height: '120px',
+        borderRadius: '16px',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E2E8F0',
+        animation: 'pulse 1.4s ease-in-out infinite',
+      }}
+    />
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+        gap: '1.25rem',
+      }}
+    >
+      {[0, 1, 2, 3].map((i) => (
+        <div
+          key={i}
+          style={{
+            height: '96px',
+            borderRadius: '16px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            animation: 'pulse 1.4s ease-in-out infinite',
+            animationDelay: `${i * 0.1}s`,
+          }}
+        />
+      ))}
+    </div>
+  </div>
+);
 
 export const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -142,7 +195,9 @@ export const Layout: React.FC = () => {
           }}
           className="dashboard-main-content"
         >
-          <Outlet />
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

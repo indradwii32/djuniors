@@ -16,12 +16,12 @@ VALUES (
 );
 
 -- Default bank accounts for manual transfer
-INSERT OR REPLACE INTO bank_accounts (id, bank_name, account_number, account_name, is_active)
+INSERT OR REPLACE INTO bank_accounts (id, bank_name, account_number, account_name, type, is_active)
 VALUES 
-    ('bank-001', 'BCA Syariah', '8881016052', 'Wahyu Adi Syahputra', 1),
-    ('bank-002', 'Bank Mandiri', '183 0000 895994', 'Wahyu Adi Syahputra', 1),
-    ('bank-003', 'Bank BRI', '1055 0101 7176 507', 'Wahyu Adi Syahputra', 1),
-    ('bank-004', 'DANA Wallet', '081252218206', 'Wahyu Adi Syahputra', 1);
+    ('bank-001', 'BCA Syariah', '8881016052', 'Wahyu Adi Syahputra', 'bank', 1),
+    ('bank-002', 'Bank Mandiri', '183 0000 895994', 'Wahyu Adi Syahputra', 'bank', 1),
+    ('bank-003', 'Bank BRI', '1055 0101 7176 507', 'Wahyu Adi Syahputra', 'bank', 1),
+    ('bank-004', 'DANA Wallet', '081252218206', 'Wahyu Adi Syahputra', 'ewallet', 1);
 
 -- Default settings
 INSERT OR REPLACE INTO settings (key, value)

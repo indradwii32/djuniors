@@ -110,14 +110,38 @@ cs.get('/overview', adminAuthMiddleware, async (c) => {
           AND pt.proof_url IS NOT NULL AND pt.proof_url != ''
     `).bind(...(refCode ? [refCode] : [])).first();
 
+    // Rincian per kelas: dipakai halaman Link & Tracking CS untuk memilih kelas
+    // saat membuat link pendaftaran per-kelas.
+    const byClass = await c.env.DB.prepare(`
+        SELECT r.class_id,
+               COALESCE(c.name, 'Kelas Djuniors') AS class_name,
+               COUNT(*) AS total,
+               COALESCE(SUM(CASE WHEN r.payment_status = 'paid' THEN 1 ELSE 0 END), 0) AS paid
+        FROM registrations r
+        LEFT JOIN classes c ON r.class_id = c.id
+        ${refCode ? 'WHERE r.ref_code = ?' : ''}
+        GROUP BY r.class_id, class_name
+        ORDER BY total DESC
+        LIMIT 50
+    `).bind(...binds).all();
+
+    // Nominal hanya untuk admin — role CS tidak melihat nilai uang pendaftaran.
+    const isAdminRole = payload.role === 'admin' || payload.role === 'super_admin';
+
     return c.json({
         success: true,
         ref_code: refCode,
         total: Number(stats?.total) || 0,
         paid: Number(stats?.paid) || 0,
-        revenue: Number(stats?.revenue) || 0,
+        revenue: isAdminRole ? Number(stats?.revenue) || 0 : 0,
         verifying: Number(stats?.verifying) || 0,
         pending_verification: Number(queue?.n) || 0,
+        by_class: (byClass.results || []).map((row: any) => ({
+            class_id: row.class_id,
+            class_name: row.class_name,
+            total: Number(row.total) || 0,
+            paid: Number(row.paid) || 0,
+        })),
     });
 });
 

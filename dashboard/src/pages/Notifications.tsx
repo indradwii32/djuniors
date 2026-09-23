@@ -33,6 +33,8 @@ import {
   Student,
   WATemplate,
 } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
+import WaSettingsCard from '../components/WaSettingsCard';
 
 // Predefined Quick Message Templates & Defaults
 export interface TemplateMeta {
@@ -312,6 +314,12 @@ const renderFormattedWhatsAppText = (rawText: string) => {
 };
 
 export const Notifications: React.FC = () => {
+  const { user } = useAuth();
+  // Role CS: hanya mengelola setelan Fonnte + template notifikasi miliknya
+  // sendiri (endpoint /api/cs/wa-settings). Seluruh modul broadcast/template
+  // global tetap admin-only, jadi CS tidak memuat data itu sama sekali.
+  const isCS = user?.role === 'cs';
+
   // Data States
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [promos, setPromos] = useState<PromoItem[]>([]);
@@ -323,8 +331,8 @@ export const Notifications: React.FC = () => {
   const [isCheckingWa, setIsCheckingWa] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Active Tab: 'manual' | 'bulk' | 'templates'
-  const [activeTab, setActiveTab] = useState<'manual' | 'bulk' | 'templates'>('manual');
+  // Active Tab: 'manual' | 'bulk' | 'templates' | 'cs'
+  const [activeTab, setActiveTab] = useState<'manual' | 'bulk' | 'templates' | 'cs'>('manual');
 
   // Template Editor States
   const [templates, setTemplates] = useState<WATemplate[]>([]);
@@ -354,6 +362,12 @@ export const Notifications: React.FC = () => {
 
   // Load Initial Data
   const loadData = useCallback(async (isRefresh = false) => {
+    // Role CS tidak memakai modul broadcast/template global (admin-only) —
+    // cukup setelan per-CS yang dimuat oleh WaSettingsCard.
+    if (isCS) {
+      setIsLoading(false);
+      return;
+    }
     try {
       if (isRefresh) setIsRefreshing(true);
       else setIsLoading(true);
@@ -682,6 +696,60 @@ export const Notifications: React.FC = () => {
   const selectedPromoObj = promos.find((p) => p.id === selectedPromoId);
   const selectedTemplateMeta = DEFAULT_TEMPLATES_MAP[selectedTemplateId] || DEFAULT_TEMPLATES_MAP['welcome'];
   const activePromoCount = promos.filter((p) => Boolean(p.is_active)).length;
+
+  // ============================================================
+  // Tampilan khusus role CS: hanya setelan notifikasi miliknya
+  // ============================================================
+  if (isCS) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
+            borderRadius: '20px',
+            padding: '2rem',
+            color: '#FFFFFF',
+            boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
+          }}
+        >
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              backgroundColor: 'rgba(37, 211, 102, 0.2)',
+              color: '#86EFAC',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              marginBottom: '0.75rem',
+            }}
+          >
+            <MessageSquare size={14} color="#25D366" />
+            <span>Notifikasi WhatsApp Saya</span>
+          </div>
+          <h2
+            style={{
+              fontFamily: "'Baloo 2', cursive",
+              fontSize: '1.85rem',
+              fontWeight: 800,
+              lineHeight: 1.2,
+              margin: '0 0 0.5rem 0',
+            }}
+          >
+            Setelan Notifikasi WhatsApp 📲
+          </h2>
+          <p style={{ margin: 0, color: '#CBD5E1', fontSize: '0.95rem', lineHeight: 1.5 }}>
+            Atur token Fonnte dan template pesan milik Anda sendiri. Notifikasi otomatis untuk
+            pendaftaran dari link Anda akan memakai template & token ini.
+          </p>
+        </div>
+
+        <WaSettingsCard isAdmin={false} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -1017,7 +1085,34 @@ export const Notifications: React.FC = () => {
           <FileText size={16} color={activeTab === 'templates' ? '#FFD93D' : '#4A90D9'} />
           <span>Editor Template ({templates.length > 0 ? templates.length : 6})</span>
         </button>
+
+        <button
+          type="button"
+          className="notif-tab-btn"
+          onClick={() => setActiveTab('cs')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '10px 10px 0 0',
+            border: 'none',
+            backgroundColor: activeTab === 'cs' ? '#4A90D9' : 'transparent',
+            color: activeTab === 'cs' ? '#FFFFFF' : '#64748B',
+            fontFamily: "'Baloo 2', cursive",
+            fontSize: '1.05rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          <MessageSquare size={16} color={activeTab === 'cs' ? '#FFD93D' : '#25D366'} />
+          <span>Notifikasi per CS</span>
+        </button>
       </div>
+
+      {/* TAB 4: Setelan notifikasi WhatsApp per CS (token Fonnte + template) */}
+      {activeTab === 'cs' && <WaSettingsCard isAdmin={true} />}
 
       {/* TAB 1: Kirim WA Manual */}
       {activeTab === 'manual' && (

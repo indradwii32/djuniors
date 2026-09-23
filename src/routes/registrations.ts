@@ -6,9 +6,10 @@ import { Hono } from 'hono';
 import { Bindings, Variables, Registration, RegistrationChild } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
-import { saveProofToR2 } from '../utils/payment';
+import { saveProofToR2, getDefaultPaymentAccount, buildPaymentInfo, normalizePaymentMethod, maskPhone, resolvePaymentMethod, PaymentMethod } from '../utils/payment';
 import { sendCsWaAuto } from '../utils/cs-wa';
 import { nextRotatorRef } from '../utils/cs-rotator';
+import { rateLimit } from '../utils/rate-limit';
 
 const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Public tracking reads are cached for 60s — long enough to absorb repeated
@@ -16,6 +17,24 @@ const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // change shows up quickly. All write paths below bump the version stamp so
 // confirmation flows invalidate immediately.
 const trackCache = cacheMiddleware('registrations', 60);
+
+// Rate limiter: mencegah enumerasi nomor registrasi / nomor WA di halaman lacak
+// dan spam pendaftaran dari satu IP.
+const trackLimiter = rateLimit({
+    name: 'track',
+    limit: 30,
+    windowSeconds: 600,
+    message: 'Terlalu banyak percobaan pelacakan. Tunggu beberapa menit lalu coba lagi.',
+});
+const registerLimiter = rateLimit({
+    name: 'register',
+    limit: 30,
+    windowSeconds: 3600,
+    message: 'Terlalu banyak pendaftaran dari jaringan ini. Silakan hubungi admin D’Juniors.',
+});
+
+/** Batas jumlah anak per pendaftaran (validasi anti-abuse). */
+const MAX_CHILDREN = 10;
 
 // Helper to format and parse registration children
 function formatRegistration(reg: any): Registration | null {
@@ -53,7 +72,7 @@ function generateRegistrationNumber(): string {
  * Buat registrasi baru (generate registration_number unik: DJN-YYYYMMDD-XXXX)
  * Public endpoint
  */
-registrations.post('/', async (c) => {
+registrations.post('/', registerLimiter, async (c) => {
     const body = await c.req.json();
     const {
         parent_name,
@@ -76,6 +95,20 @@ registrations.post('/', async (c) => {
             error: 'Missing required fields',
             message: 'parent_name, parent_phone, class_id, schedule_slot, and children are required'
         }, 400);
+    }
+
+    // Validasi bentuk data (anti-abuse: input panjang/aneh ditolak lebih awal).
+    const parentNameStr = String(parent_name).trim();
+    const parentPhoneStr = String(parent_phone).trim();
+    if (parentNameStr.length < 2 || parentNameStr.length > 120) {
+        return c.json({ error: 'Invalid name', message: 'Nama orang tua tidak valid' }, 400);
+    }
+    const phoneDigits = parentPhoneStr.replace(/\D/g, '');
+    if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+        return c.json({ error: 'Invalid phone', message: 'Nomor WhatsApp tidak valid' }, 400);
+    }
+    if (notes && String(notes).length > 1000) {
+        return c.json({ error: 'Notes too long', message: 'Catatan maksimal 1000 karakter' }, 400);
     }
 
     // Check if class exists
@@ -122,6 +155,27 @@ registrations.post('/', async (c) => {
     const scheduleSlotStr = typeof schedule_slot === 'object'
         ? JSON.stringify(schedule_slot)
         : String(schedule_slot);
+
+    // Validasi isi daftar anak: minimal 1, maksimum MAX_CHILDREN, tiap anak
+    // wajib punya nama (mencegah baris kosong/spam).
+    if (parsedChildren.length > MAX_CHILDREN) {
+        return c.json({
+            error: 'Too many children',
+            message: `Maksimal ${MAX_CHILDREN} anak dalam satu pendaftaran`
+        }, 400);
+    }
+    const cleanedChildren = parsedChildren
+        .map((child) => ({
+            name: String((child as any)?.name || '').trim().slice(0, 120),
+            age_or_class: String((child as any)?.age_or_class || (child as any)?.grade || '').trim().slice(0, 60),
+        }))
+        .filter((child) => child.name.length > 0);
+
+    if (cleanedChildren.length === 0) {
+        return c.json({ error: 'Invalid children', message: 'Nama anak wajib diisi' }, 400);
+    }
+    parsedChildren = cleanedChildren;
+    childrenJsonStr = JSON.stringify(cleanedChildren);
 
     // Calculate total amount
     const numChildren = Math.max(1, parsedChildren.length);
@@ -181,7 +235,11 @@ registrations.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID();
-    const method = payment_method || 'bank_transfer';
+    // Metode pembayaran: pakai pilihan pendaftar bila metodenya memang diatur
+    // admin (punya akun aktif); kalau tidak, jatuh ke metode tersedia pertama
+    // agar pendaftaran tidak pernah gagal karena perubahan setelan.
+    const resolved = await resolvePaymentMethod(c.env.DB, payment_method);
+    const method: PaymentMethod = resolved.method;
 
     // Sumber link CS (?ref=) — simpan hanya bila kode terdaftar & aktif.
     let storedRefCode: string | null = null;
@@ -200,21 +258,15 @@ registrations.post('/', async (c) => {
         storedRefCode = await nextRotatorRef(c.env.DB);
     }
 
-    // Snapshot rekening bank yang dipilih pendaftar di step terakhir —
-    // diverifikasi server-side ke tabel bank_accounts (tidak dipercaya dari client).
-    let bankAccountId: string | null = null;
-    let bankName: string | null = null;
-    let bankNumber: string | null = null;
-    if (bank_account_id && typeof bank_account_id === 'string') {
-        const bank = await c.env.DB.prepare(
-            'SELECT id, bank_name, account_number FROM bank_accounts WHERE id = ? AND is_active = 1'
-        ).bind(bank_account_id).first();
-        if (bank) {
-            bankAccountId = bank.id as string;
-            bankName = bank.bank_name as string;
-            bankNumber = bank.account_number as string;
-        }
-    }
+    // Detail pembayaran: rekening default per metode ditentukan SERVER-SIDE
+    // (client tidak mengirim pilihan rekening lagi), lalu di-snapshot ke baris
+    // pendaftaran supaya info pembayaran tetap utuh walau admin mengubah daftar
+    // rekening di kemudian hari.
+    const defaultAccount = await getDefaultPaymentAccount(c.env.DB, method);
+    const bankAccountId: string | null = defaultAccount?.id ? String(defaultAccount.id) : null;
+    const bankName: string | null = defaultAccount?.bank_name ? String(defaultAccount.bank_name) : null;
+    const bankNumber: string | null = defaultAccount?.account_number ? String(defaultAccount.account_number) : null;
+    const bankHolder: string | null = defaultAccount?.account_name ? String(defaultAccount.account_name) : null;
 
     // Insert registration
     await c.env.DB.prepare(`
@@ -222,15 +274,15 @@ registrations.post('/', async (c) => {
             id, registration_number, parent_name, parent_phone, parent_email, parent_city,
             class_id, schedule_slot, children, total_amount, discount_amount, final_amount,
             promo_code, payment_method, status, payment_status, notes,
-            ref_code, bank_account_id, bank_name, bank_account_number
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?)
+            ref_code, bank_account_id, bank_name, bank_account_number, bank_account_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?)
     `).bind(
         id,
         registrationNumber,
-        parent_name.trim(),
-        parent_phone.trim(),
-        parent_email ? parent_email.trim() : null,
-        parent_city ? parent_city.trim() : null,
+        parentNameStr,
+        parentPhoneStr,
+        parent_email ? String(parent_email).trim().slice(0, 160) : null,
+        parent_city ? String(parent_city).trim().slice(0, 120) : null,
         class_id,
         scheduleSlotStr,
         childrenJsonStr,
@@ -239,11 +291,12 @@ registrations.post('/', async (c) => {
         finalAmount,
         appliedPromoCode,
         method,
-        notes || null,
+        notes ? String(notes).trim() : null,
         storedRefCode,
         bankAccountId,
         bankName,
-        bankNumber
+        bankNumber,
+        bankHolder
     ).run();
 
     // Create initial payment tracking record
@@ -256,7 +309,7 @@ registrations.post('/', async (c) => {
         trackingId,
         id,
         registrationNumber,
-        parent_phone.trim(),
+        parentPhoneStr,
         finalAmount,
         method,
         'Registrasi baru dibuat'
@@ -271,9 +324,9 @@ registrations.post('/', async (c) => {
         c.env,
         {
             registration_number: registrationNumber,
-            parent_name: parent_name.trim(),
-            parent_phone: parent_phone.trim(),
-            parent_city: parent_city ? parent_city.trim() : null,
+            parent_name: parentNameStr,
+            parent_phone: parentPhoneStr,
+            parent_city: parent_city ? String(parent_city).trim() : null,
             class_id,
             class_name: classInfo.name,
             schedule_slot: scheduleSlotStr,
@@ -288,19 +341,31 @@ registrations.post('/', async (c) => {
         { baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin }
     );
 
+    // Info pembayaran lengkap untuk popup sukses & halaman lacak: hanya berisi
+    // detail metode yang dipilih pendaftar (bukan semua metode).
+    const payment = buildPaymentInfo({
+        method,
+        amount: finalAmount,
+        account: { bank_name: bankName, account_number: bankNumber, account_name: bankHolder },
+        registrationNumber,
+    });
+
     return c.json({
         success: true,
         id,
         registration_number: registrationNumber,
         tracking_id: trackingId,
         wa_notification: waNotification,
+        payment,
+        // true bila metode pilihan pendaftar tidak tersedia lalu diganti server
+        payment_method_adjusted: resolved.adjusted,
         registration: {
             id,
             registration_number: registrationNumber,
-            parent_name: parent_name.trim(),
-            parent_phone: parent_phone.trim(),
-            parent_email: parent_email ? parent_email.trim() : null,
-            parent_city: parent_city ? parent_city.trim() : null,
+            parent_name: parentNameStr,
+            parent_phone: parentPhoneStr,
+            parent_email: parent_email ? String(parent_email).trim() : null,
+            parent_city: parent_city ? String(parent_city).trim() : null,
             class_id,
             class_name: classInfo.name,
             schedule_slot: scheduleSlotStr,
@@ -312,10 +377,11 @@ registrations.post('/', async (c) => {
             payment_method: method,
             status: 'pending',
             payment_status: 'unpaid',
-            notes: notes || null,
+            notes: notes ? String(notes).trim() : null,
             ref_code: storedRefCode,
             bank_name: bankName,
-            bank_account_number: bankNumber
+            bank_account_number: bankNumber,
+            bank_account_name: bankHolder
         },
         message: 'Registrasi berhasil dibuat'
     }, 201);
@@ -451,10 +517,15 @@ registrations.get('/', adminAuthMiddleware, async (c) => {
 });
 
 /**
- * 4. GET /api/registrations/track/:number
- * Lacak status pembayaran (public, by registration_number)
+ * 5. GET /api/registrations/track/:number
+ * Lacak status pembayaran (public, by registration_number).
+ *
+ * KEAMANAN: data pendaftar tidak lagi terbuka hanya dengan nomor registrasi.
+ * Pemanggil harus memverifikasi kepemilikan dengan 4 digit terakhir nomor
+ * WhatsApp pendaftar (atau nomor WhatsApp lengkap) melalui `?verify=`/`?phone=`.
+ * Tanpa verifikasi yang cocok, endpoint hanya membalas 401 tanpa data apa pun.
  */
-registrations.get('/track/:number', trackCache, async (c) => {
+registrations.get('/track/:number', trackLimiter, trackCache, async (c) => {
     const registrationNumber = (c.req.param('number') || '').trim();
 
     const registration = await c.env.DB.prepare(`
@@ -468,31 +539,93 @@ registrations.get('/track/:number', trackCache, async (c) => {
         return c.json({ error: 'Registration not found', message: 'Nomor registrasi tidak ditemukan' }, 404);
     }
 
+    // Verifikasi kepemilikan: 4 digit terakhir nomor WA atau nomor lengkap.
+    const providedDigits = String(c.req.query('verify') || c.req.query('phone') || '').replace(/\D/g, '');
+    const ownerDigits = String(registration.parent_phone || '').replace(/\D/g, '');
+    const isVerified =
+        providedDigits.length >= 4 &&
+        ownerDigits.length >= 4 &&
+        ownerDigits.endsWith(providedDigits.slice(-4)) &&
+        (providedDigits.length === 4 || ownerDigits === providedDigits);
+
+    if (!isVerified) {
+        return c.json({
+            error: 'Verification required',
+            message: 'Masukkan 4 digit terakhir nomor WhatsApp yang dipakai saat mendaftar.',
+            registration_number: registrationNumber,
+            verified: false,
+        }, 401);
+    }
+
     const trackingList = await c.env.DB.prepare(`
-        SELECT * FROM payment_tracking
+        SELECT status, amount, payment_method, created_at, proof_url
+        FROM payment_tracking
         WHERE registration_number = ?
         ORDER BY created_at DESC
+        LIMIT 20
     `).bind(registrationNumber).all();
 
+    // Info pembayaran hanya untuk metode yang dipilih saat pendaftaran.
+    let account: { bank_name?: string | null; account_number?: string | null; account_name?: string | null } | null = {
+        bank_name: registration.bank_name as string | null,
+        account_number: registration.bank_account_number as string | null,
+        account_name: registration.bank_account_name as string | null,
+    };
+    if (!account.account_number && !account.bank_name) {
+        const fallback = await getDefaultPaymentAccount(c.env.DB, normalizePaymentMethod(registration.payment_method));
+        account = fallback
+            ? { bank_name: fallback.bank_name, account_number: fallback.account_number, account_name: fallback.account_name }
+            : null;
+    }
+
+    const payment = buildPaymentInfo({
+        method: registration.payment_method,
+        amount: Number(registration.final_amount) || 0,
+        account,
+        registrationNumber,
+    });
+
     const formatted = formatRegistration(registration);
+    // Buang kolom internal sebelum dikirim ke halaman publik (email & catatan
+    // admin tidak perlu). `id` tetap dikirim karena dipakai halaman lacak untuk
+    // mengunggah bukti bayar — nilainya UUID acak yang hanya didapat setelah
+    // verifikasi kepemilikan di atas.
+    const { notes, parent_email, ...safe } = formatted as any;
 
     return c.json({
         success: true,
-        registration: formatted,
-        tracking: trackingList.results
+        verified: true,
+        registration: {
+            ...safe,
+            parent_phone: maskPhone(registration.parent_phone),
+            payment_method: payment.method,
+        },
+        payment,
+        tracking: trackingList.results,
     });
 });
 
 /**
- * 5. GET /api/registrations/track/phone/:phone
- * Lacak by nomor WA (public)
+ * 6. GET /api/registrations/track/phone/:phone
+ * Lacak by nomor WA (public) — HANYA mengembalikan ringkasan terbatas.
+ *
+ * KEAMANAN: pencarian memakai nomor WA lengkap (bukan potongan angka, yang
+ * sebelumnya memungkinkan enumerasi), dan hasilnya tidak memuat data pribadi
+ * (nama anak, kota, nomor telepon). Untuk membuka detail, pengguna harus
+ * membuka nomor registrasi + verifikasi 4 digit terakhir nomor WA.
  */
-registrations.get('/track/phone/:phone', trackCache, async (c) => {
+registrations.get('/track/phone/:phone', trackLimiter, trackCache, async (c) => {
     const rawPhone = (c.req.param('phone') || '').trim();
-    // Normalize phone format for matching (e.g. 08123 vs 628123)
     const cleanPhone = rawPhone.replace(/\D/g, '');
-    let alternatePhone = cleanPhone;
 
+    if (cleanPhone.length < 8) {
+        return c.json({
+            error: 'Invalid phone',
+            message: 'Masukkan nomor WhatsApp lengkap (minimal 8 digit).',
+        }, 400);
+    }
+
+    let alternatePhone = cleanPhone;
     if (cleanPhone.startsWith('62')) {
         alternatePhone = '0' + cleanPhone.substring(2);
     } else if (cleanPhone.startsWith('0')) {
@@ -500,19 +633,41 @@ registrations.get('/track/phone/:phone', trackCache, async (c) => {
     }
 
     const result = await c.env.DB.prepare(`
-        SELECT r.*, c.name as class_name, c.description as class_description
+        SELECT r.registration_number, r.parent_name, r.status, r.payment_status,
+               r.final_amount, r.created_at, r.children, c.name as class_name
         FROM registrations r
         LEFT JOIN classes c ON r.class_id = c.id
-        WHERE r.parent_phone = ? OR r.parent_phone = ? OR r.parent_phone LIKE ?
+        WHERE r.parent_phone = ? OR r.parent_phone = ?
         ORDER BY r.created_at DESC
-    `).bind(rawPhone, alternatePhone, `%${cleanPhone.slice(-8)}%`).all();
+        LIMIT 20
+    `).bind(cleanPhone, alternatePhone).all();
 
-    const formatted = result.results.map(formatRegistration);
+    const summarize = (row: any) => {
+        let childCount = 1;
+        try {
+            const parsed = typeof row.children === 'string' ? JSON.parse(row.children) : row.children;
+            if (Array.isArray(parsed) && parsed.length > 0) childCount = parsed.length;
+        } catch { /* biarkan default */ }
+        const name = String(row.parent_name || '').trim();
+        return {
+            registration_number: row.registration_number,
+            // Nama disamarkan: cukup untuk mengenali milik sendiri.
+            parent_name_masked: name
+                ? `${name.split(' ')[0]} ${name.split(' ').slice(1).map((w: string) => `${w[0] || ''}.`).join(' ')}`.trim()
+                : '-',
+            class_name: row.class_name || 'Kelas Djuniors',
+            status: row.status,
+            payment_status: row.payment_status,
+            final_amount: row.final_amount,
+            children_count: childCount,
+            created_at: row.created_at,
+        };
+    };
 
     return c.json({
         success: true,
-        count: formatted.length,
-        registrations: formatted
+        count: result.results.length,
+        registrations: result.results.map(summarize),
     });
 });
 
@@ -620,7 +775,12 @@ registrations.put('/:id/status', adminAuthMiddleware, async (c) => {
  * 7. POST /api/registrations/:id/payment
  * Upload bukti bayar (public)
  */
-registrations.post('/:id/payment', async (c) => {
+registrations.post('/:id/payment', rateLimit({
+    name: 'proof',
+    limit: 20,
+    windowSeconds: 3600,
+    message: 'Terlalu banyak unggahan bukti dari jaringan ini. Coba lagi nanti.',
+}), async (c) => {
     const id = c.req.param('id');
 
     const registration = await c.env.DB.prepare(
@@ -665,6 +825,24 @@ registrations.post('/:id/payment', async (c) => {
     if (!proofUrl) {
         return c.json({ error: 'Missing payment proof', message: 'proof_url atau file bukti bayar diperlukan' }, 400);
     }
+
+    // Validasi bukti: harus gambar (data-URL / URL) dan tidak melebihi 5MB —
+    // mencegah R2/D1 diisi berkas sampah atau lampiran tak relevan.
+    const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+    if (proofUrl.startsWith('data:')) {
+        const mimeMatch = proofUrl.match(/^data:([^;,]+)/);
+        const mime = mimeMatch ? mimeMatch[1] : '';
+        if (!mime.startsWith('image/')) {
+            return c.json({ error: 'Invalid file type', message: 'Bukti pembayaran harus berupa gambar (JPG/PNG/WEBP)' }, 400);
+        }
+        // Panjang base64 ≈ 4/3 ukuran biner.
+        if (proofUrl.length > MAX_PROOF_BYTES * 1.4) {
+            return c.json({ error: 'File too large', message: 'Ukuran bukti pembayaran maksimal 5MB' }, 413);
+        }
+    }
+
+    // Metode pembayaran dinormalisasi (hanya 3 metode resmi yang diterima).
+    paymentMethod = normalizePaymentMethod(paymentMethod);
 
     // Bukti berupa data-URL base64 (dari halaman lacak) → simpan ke R2 agar
     // ringkas & bisa di-cache; selain itu diterima apa adanya.

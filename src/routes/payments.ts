@@ -5,7 +5,16 @@
 import { Hono } from 'hono';
 import { Bindings } from '../types';
 import { authMiddleware, adminAuthMiddleware } from '../middleware/auth';
-import { getBankAccounts, generatePaymentInstruction, generateUniqueAmount } from '../utils/payment';
+import { getBankAccounts, generatePaymentInstruction, generateUniqueAmount, getAvailablePaymentMethods } from '../utils/payment';
+import { PaymentAccountType } from '../types';
+
+/** Validasi tipe akun pembayaran dari input admin. */
+function normalizeAccountType(value: unknown): PaymentAccountType {
+    const v = String(value || '').trim().toLowerCase();
+    if (v === 'ewallet' || v === 'e-wallet') return 'ewallet';
+    if (v === 'qris') return 'qris';
+    return 'bank';
+}
 
 const payments = new Hono<{ Bindings: Bindings }>();
 
@@ -64,6 +73,18 @@ payments.get('/', adminAuthMiddleware, async (c) => {
     });
 
     return c.json(formatted);
+});
+
+// ============================================
+// Metode pembayaran yang tersedia (public)
+// ============================================
+// Dipakai form pendaftaran agar kartu metode pembayaran hanya menampilkan
+// metode yang benar-benar diatur admin. Sengaja TIDAK mengirim nomor rekening —
+// detail pembayaran baru muncul setelah pendaftaran dikirim.
+// Didaftarkan sebelum '/:id' supaya tidak tertangkap route tersebut.
+payments.get('/methods', async (c) => {
+    const methods = await getAvailablePaymentMethods(c.env.DB);
+    return c.json({ success: true, methods });
 });
 
 // Get payment by ID
@@ -226,6 +247,7 @@ payments.post('/banks', adminAuthMiddleware, async (c) => {
     const bankName = (body.bank_name || '').trim();
     const accountNumber = (body.account_number || '').trim();
     const accountName = (body.account_name || '').trim();
+    const type = normalizeAccountType(body.type);
 
     if (!bankName || !accountNumber || !accountName) {
         return c.json({
@@ -236,9 +258,9 @@ payments.post('/banks', adminAuthMiddleware, async (c) => {
 
     const id = crypto.randomUUID();
     await c.env.DB.prepare(`
-        INSERT INTO bank_accounts (id, bank_name, account_number, account_name, is_active)
-        VALUES (?, ?, ?, ?, 1)
-    `).bind(id, bankName, accountNumber, accountName).run();
+        INSERT INTO bank_accounts (id, bank_name, account_number, account_name, type, is_active)
+        VALUES (?, ?, ?, ?, ?, 1)
+    `).bind(id, bankName, accountNumber, accountName, type).run();
 
     const created = await c.env.DB.prepare('SELECT * FROM bank_accounts WHERE id = ?').bind(id).first();
     return c.json({ success: true, bank: created, message: 'Rekening berhasil ditambahkan' }, 201);
@@ -257,6 +279,9 @@ payments.put('/banks/:id', adminAuthMiddleware, async (c) => {
     const bankName = body.bank_name !== undefined ? String(body.bank_name).trim() : (existing.bank_name as string);
     const accountNumber = body.account_number !== undefined ? String(body.account_number).trim() : (existing.account_number as string);
     const accountName = body.account_name !== undefined ? String(body.account_name).trim() : (existing.account_name as string);
+    const type = body.type !== undefined
+        ? normalizeAccountType(body.type)
+        : normalizeAccountType(existing.type);
     const isActive = body.is_active !== undefined ? (body.is_active ? 1 : 0) : (existing.is_active ? 1 : 0);
 
     if (!bankName || !accountNumber || !accountName) {
@@ -264,9 +289,9 @@ payments.put('/banks/:id', adminAuthMiddleware, async (c) => {
     }
 
     await c.env.DB.prepare(`
-        UPDATE bank_accounts SET bank_name = ?, account_number = ?, account_name = ?, is_active = ?
+        UPDATE bank_accounts SET bank_name = ?, account_number = ?, account_name = ?, type = ?, is_active = ?
         WHERE id = ?
-    `).bind(bankName, accountNumber, accountName, isActive, id).run();
+    `).bind(bankName, accountNumber, accountName, type, isActive, id).run();
 
     const updated = await c.env.DB.prepare('SELECT * FROM bank_accounts WHERE id = ?').bind(id).first();
     return c.json({ success: true, bank: updated, message: 'Rekening berhasil diperbarui' });

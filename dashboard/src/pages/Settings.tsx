@@ -67,6 +67,7 @@ export const Settings: React.FC = () => {
   const [newBankName, setNewBankName] = useState<string>('BCA Syariah');
   const [newAccountNumber, setNewAccountNumber] = useState<string>('');
   const [newAccountName, setNewAccountName] = useState<string>('Wahyu Adi Syahputra');
+  const [newAccountType, setNewAccountType] = useState<'bank' | 'ewallet' | 'qris'>('bank');
 
   // WhatsApp State
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
@@ -227,6 +228,18 @@ export const Settings: React.FC = () => {
     }
   };
 
+  // Ubah jenis akun pembayaran (bank / e-wallet / QRIS) — menentukan metode
+  // mana yang memakai rekening ini saat detail pembayaran ditampilkan.
+  const handleChangeBankType = async (id: string, type: 'bank' | 'ewallet' | 'qris') => {
+    try {
+      await paymentsApi.updateBank(id, { type });
+      setBanks((prev) => prev.map((b) => (b.id === id ? { ...b, type } : b)));
+      showToast('Jenis akun pembayaran berhasil disimpan!');
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan jenis akun', 'error');
+    }
+  };
+
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAccountNumber.trim()) {
@@ -240,6 +253,7 @@ export const Settings: React.FC = () => {
         bank_name: newBankName.trim(),
         account_number: newAccountNumber.trim(),
         account_name: newAccountName.trim() || 'Wahyu Adi Syahputra',
+        type: newAccountType,
       });
       if (res?.bank) {
         setBanks((prev) => [...prev, res.bank]);
@@ -657,6 +671,7 @@ export const Settings: React.FC = () => {
                     <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>NAMA BANK</th>
                     <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>NOMOR REKENING</th>
                     <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>ATAS NAMA (PEMILIK)</th>
+                    <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>JENIS / METODE</th>
                     <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>STATUS</th>
                     <th style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textAlign: 'right' }}>AKSI</th>
                   </tr>
@@ -672,6 +687,28 @@ export const Settings: React.FC = () => {
                           {bank.account_number}
                         </td>
                         <td style={{ padding: '1rem 1.25rem', color: '#475569', fontSize: '0.875rem' }}>{bank.account_name}</td>
+                        <td style={{ padding: '1rem 1.25rem' }}>
+                          <select
+                            value={bank.type || 'bank'}
+                            onChange={(e) => handleChangeBankType(bank.id, e.target.value as 'bank' | 'ewallet' | 'qris')}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '8px',
+                              border: '1px solid #CBD5E1',
+                              backgroundColor: '#FFFFFF',
+                              color: '#334155',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              fontFamily: 'inherit',
+                              cursor: 'pointer',
+                            }}
+                            aria-label={`Jenis akun pembayaran ${bank.bank_name}`}
+                          >
+                            <option value="bank">🏦 Transfer Bank</option>
+                            <option value="ewallet">💳 E-Wallet</option>
+                            <option value="qris">📱 QRIS</option>
+                          </select>
+                        </td>
                         <td style={{ padding: '1rem 1.25rem' }}>
                           <span
                             style={{
@@ -1549,6 +1586,24 @@ export const Settings: React.FC = () => {
                   placeholder="Contoh: Wahyu Adi Syahputra"
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                 />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                  Jenis / Metode Pembayaran *
+                </label>
+                <select
+                  value={newAccountType}
+                  onChange={(e) => setNewAccountType(e.target.value as 'bank' | 'ewallet' | 'qris')}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', fontFamily: 'inherit', backgroundColor: '#FFFFFF' }}
+                >
+                  <option value="bank">🏦 Transfer Bank</option>
+                  <option value="ewallet">💳 E-Wallet</option>
+                  <option value="qris">📱 QRIS</option>
+                </select>
+                <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                  Detail pembayaran yang tampil ke pendaftar mengikuti metode yang mereka pilih.
+                </p>
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>

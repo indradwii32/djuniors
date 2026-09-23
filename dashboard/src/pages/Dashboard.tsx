@@ -471,9 +471,6 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Free-tier burn-rate monitor (aggregated usage counters) */}
-      <UsageGauge />
-
       {/* Quick Action Buttons */}
       <div
         style={{
@@ -1027,6 +1024,21 @@ const AdminDashboard: React.FC = () => {
             <span>Cloudflare D1 & KV: Online</span>
           </span>
         </div>
+      </div>
+
+      {/* Footer: konsumsi free tier dipindah ke paling bawah agar area atas
+          dashboard fokus pada data operasional (permintaan pemilik produk). */}
+      <UsageGauge />
+
+      <div
+        style={{
+          textAlign: 'center',
+          color: '#94A3B8',
+          fontSize: '0.75rem',
+          paddingTop: '0.25rem',
+        }}
+      >
+        D’Juniors Learning Center · Panel Administrator
       </div>
     </div>
   );

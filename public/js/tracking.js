@@ -1,6 +1,16 @@
 // ============================================
 // Djuniors - Tracking Page JavaScript
 // ============================================
+// Halaman publik "Lacak Status & Pembayaran".
+//
+// Aturan keamanan yang berlaku di sini (lihat juga src/routes/registrations.ts):
+//  1. Detail pendaftaran HANYA terbuka setelah verifikasi 4 digit terakhir
+//     nomor WhatsApp pendaftar (endpoint /track/:number?verify=).
+//  2. Pencarian by nomor WA hanya mengembalikan ringkasan terbatas (tanpa nama
+//     anak, kota, atau nomor telepon).
+//  3. Nomor WhatsApp selalu ditampilkan dalam bentuk termask (0812****8206).
+//  4. Info pembayaran yang tampil mengikuti metode yang dipilih pendaftar —
+//     bukan semua metode/rekening sekaligus.
 
 const API_BASE = window.API_BASE || (window.location.origin.includes(':8787') ? '' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://api.djuniorslc.com'));
 
@@ -21,8 +31,14 @@ function imageUrl(src, opts = {}) {
 class DjuniorsTracking {
     constructor() {
         this.currentData = null;
+        this.currentPayment = null;
         this.selectedProofFile = null;
         this.proofBase64 = null;
+
+        // Nomor registrasi yang menunggu verifikasi + nomor WA yang dipakai
+        // saat mencari (untuk auto-verifikasi daftar hasil pencarian nomor).
+        this.pendingRegNumber = null;
+        this.searchedPhone = null;
 
         this.init();
     }
@@ -43,6 +59,31 @@ class DjuniorsTracking {
                 }
             });
         }
+
+        // Verifikasi kepemilikan pendaftaran
+        const verifyBtn = document.getElementById('btn-verify-submit');
+        if (verifyBtn) {
+            verifyBtn.addEventListener('click', () => this.submitVerification());
+        }
+        const verifyInput = document.getElementById('verify-input');
+        if (verifyInput) {
+            verifyInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.submitVerification();
+                }
+            });
+        }
+    }
+
+    submitVerification() {
+        const digits = (document.getElementById('verify-input')?.value || '').replace(/\D/g, '');
+        if (digits.length !== 4) {
+            alert('Masukkan tepat 4 digit terakhir nomor WhatsApp pendaftar.');
+            return;
+        }
+        if (!this.pendingRegNumber) return;
+        this.searchByNumber(this.pendingRegNumber, digits);
     }
 
     checkUrlParams() {
@@ -50,11 +91,12 @@ class DjuniorsTracking {
         const number = params.get('number') || params.get('reg');
         const phone = params.get('phone');
         const q = params.get('q');
+        const verify = params.get('verify');
 
         if (number) {
             const input = document.getElementById('search-query-input');
             if (input) input.value = number;
-            this.searchByNumber(number);
+            this.searchByNumber(number, verify);
         } else if (phone) {
             const input = document.getElementById('search-query-input');
             if (input) input.value = phone;
@@ -67,7 +109,6 @@ class DjuniorsTracking {
     }
 
     performSearch(query) {
-        // Update URL query string without reloading
         const cleanQuery = query.trim();
         const isRegNumber = cleanQuery.toUpperCase().startsWith('DJN') || cleanQuery.includes('-');
 
@@ -82,6 +123,7 @@ class DjuniorsTracking {
         const views = [
             'view-placeholder',
             'view-loading',
+            'view-verify',
             'view-error',
             'view-single-result',
             'view-multi-result'
@@ -102,30 +144,65 @@ class DjuniorsTracking {
     }
 
     /**
-     * 1. Search by Registration Number
+     * Tampilkan form verifikasi 4 digit terakhir nomor WhatsApp.
      */
-    async searchByNumber(regNumber) {
+    showVerifyView(regNumber, message) {
+        this.pendingRegNumber = regNumber;
+        const msgEl = document.getElementById('verify-message');
+        const numEl = document.getElementById('verify-reg-number');
+        const input = document.getElementById('verify-input');
+        if (msgEl && message) {
+            msgEl.innerHTML = message;
+        }
+        if (numEl) numEl.textContent = regNumber;
+        if (input) input.value = '';
+        this.showView('view-verify');
+        setTimeout(() => input?.focus(), 100);
+    }
+
+    /**
+     * 1. Search by Registration Number
+     * Membutuhkan verifikasi 4 digit terakhir nomor WA pendaftar.
+     */
+    async searchByNumber(regNumber, verify) {
         this.showView('view-loading');
 
         try {
-            const response = await fetch(`${API_BASE}/api/registrations/track/${encodeURIComponent(regNumber)}`);
+            const qs = verify ? `?verify=${encodeURIComponent(verify)}` : '';
+            const response = await fetch(`${API_BASE}/api/registrations/track/${encodeURIComponent(regNumber)}${qs}`);
             const data = await response.json();
+
+            // 401 → butuh verifikasi kepemilikan
+            if (response.status === 401) {
+                this.showVerifyView(
+                    regNumber,
+                    data?.message ||
+                        'Demi keamanan, masukkan <strong>4 digit terakhir nomor WhatsApp</strong> yang Anda pakai saat mendaftar.'
+                );
+                return;
+            }
+
+            // 429 → rate limit
+            if (response.status === 429) {
+                this.showError('Terlalu Banyak Percobaan', data?.message || 'Coba lagi beberapa menit kemudian.');
+                return;
+            }
 
             if (response.ok && data.success && data.registration) {
                 this.currentData = data.registration;
-                this.renderSingleResult(data.registration, data.tracking);
+                this.currentPayment = data.payment || null;
+                this.renderSingleResult(data.registration, data.tracking, data.payment);
                 this.showView('view-single-result');
-
-                // Update URL parameter
                 window.history.replaceState({}, '', `lacak.html?number=${encodeURIComponent(regNumber)}`);
-            } else {
-                // If not found by number, try phone search as fallback if it looks numerical
-                const digits = regNumber.replace(/\D/g, '');
-                if (digits.length >= 8) {
-                    return this.searchByPhone(regNumber);
-                }
-                this.showError('Pendaftaran Tidak Ditemukan', `Nomor registrasi "${regNumber}" tidak ditemukan di database kami. Pastikan nomor sudah benar.`);
+                return;
             }
+
+            // Tidak ditemukan → kalau bentuknya nomor telepon, coba lacak via nomor WA
+            const digits = regNumber.replace(/\D/g, '');
+            if (digits.length >= 8) {
+                return this.searchByPhone(regNumber);
+            }
+            this.showError('Pendaftaran Tidak Ditemukan', `Nomor registrasi "${regNumber}" tidak ditemukan di database kami. Pastikan nomor sudah benar.`);
         } catch (error) {
             console.error('Tracking by number error:', error);
             this.showError('Terjadi Kesalahan', 'Gagal memuat data dari server. Silakan periksa koneksi internet Anda atau coba sesaat lagi.');
@@ -134,32 +211,38 @@ class DjuniorsTracking {
 
     /**
      * 2. Search by Phone Number
+     * Hasilnya ringkasan terbatas; detail dibuka setelah verifikasi.
      */
     async searchByPhone(phone) {
         this.showView('view-loading');
 
         try {
-            const response = await fetch(`${API_BASE}/api/registrations/track/phone/${encodeURIComponent(phone)}`);
+            const digitsOnly = String(phone).replace(/\D/g, '');
+            const response = await fetch(`${API_BASE}/api/registrations/track/phone/${encodeURIComponent(digitsOnly)}`);
             const data = await response.json();
 
+            if (response.status === 429) {
+                this.showError('Terlalu Banyak Percobaan', data?.message || 'Coba lagi beberapa menit kemudian.');
+                return;
+            }
+
             if (response.ok && data.success && Array.isArray(data.registrations)) {
+                // Nomor yang dipakai untuk mencari → dipakai sebagai verifikasi
+                // saat membuka detail (4 digit terakhir).
+                this.searchedPhone = digitsOnly;
+
                 if (data.registrations.length === 0) {
                     this.showError('Pendaftaran Tidak Ditemukan', `Tidak ada data pendaftaran yang terdaftar dengan nomor WhatsApp "${phone}".`);
                 } else if (data.registrations.length === 1) {
-                    // Single result -> render directly
                     const reg = data.registrations[0];
-                    this.currentData = reg;
-                    this.renderSingleResult(reg);
-                    this.showView('view-single-result');
-                    window.history.replaceState({}, '', `lacak.html?number=${encodeURIComponent(reg.registration_number)}`);
+                    this.searchByNumber(reg.registration_number, digitsOnly.slice(-4));
                 } else {
-                    // Multiple results -> render list
                     this.renderMultiResults(data.registrations, phone);
                     this.showView('view-multi-result');
-                    window.history.replaceState({}, '', `lacak.html?phone=${encodeURIComponent(phone)}`);
+                    window.history.replaceState({}, '', `lacak.html?phone=${encodeURIComponent(digitsOnly)}`);
                 }
             } else {
-                this.showError('Pendaftaran Tidak Ditemukan', `Tidak ditemukan data untuk nomor "${phone}".`);
+                this.showError('Pendaftaran Tidak Ditemukan', data?.message || `Tidak ditemukan data untuk nomor "${phone}".`);
             }
         } catch (error) {
             console.error('Tracking by phone error:', error);
@@ -170,11 +253,10 @@ class DjuniorsTracking {
     /**
      * Render Single Registration Detail
      */
-    renderSingleResult(reg, trackingList = []) {
+    renderSingleResult(reg, trackingList = [], payment = null) {
         const container = document.getElementById('view-single-result');
         if (!container) return;
 
-        // Status badges text and classes
         const statusMap = {
             pending: { text: '🟡 Menunggu Konfirmasi', class: 'pending' },
             confirmed: { text: '🟢 Terkonfirmasi', class: 'confirmed' },
@@ -191,7 +273,6 @@ class DjuniorsTracking {
         const regStatus = statusMap[reg.status] || { text: reg.status, class: 'pending' };
         const payStatus = paymentStatusMap[reg.payment_status] || { text: reg.payment_status, class: 'pending' };
 
-        // Parse children list
         let children = [];
         if (Array.isArray(reg.children)) {
             children = reg.children;
@@ -203,7 +284,6 @@ class DjuniorsTracking {
             }
         }
 
-        // Format date
         let createdDateStr = '-';
         if (reg.created_at) {
             const date = new Date(reg.created_at);
@@ -216,13 +296,11 @@ class DjuniorsTracking {
             });
         }
 
-        // Timeline Step Calculation
         let step1Class = 'completed';
         let step2Class = reg.payment_status === 'unpaid' ? 'active' : 'completed';
         let step3Class = reg.payment_status === 'pending' ? 'active' : (reg.payment_status === 'paid' ? 'completed' : '');
         let step4Class = (reg.status === 'confirmed' && reg.payment_status === 'paid') ? 'completed' : '';
 
-        // Generate WA message link
         const waMsg = `Halo Admin Djuniors! Saya ingin menanyakan status pendaftaran No: *${reg.registration_number}* atas nama *${reg.parent_name}*. Terima kasih!`;
         const waLink = `https://wa.me/6287714977001?text=${encodeURIComponent(waMsg)}`;
 
@@ -285,7 +363,7 @@ class DjuniorsTracking {
                         </div>
                     </div>
 
-                    <!-- Parent Info -->
+                    <!-- Parent Info (nomor WA termask) -->
                     <div class="detail-card">
                         <div class="detail-card-title">👨‍👩‍👧 Data Orang Tua</div>
                         <div class="detail-item">
@@ -294,7 +372,7 @@ class DjuniorsTracking {
                         </div>
                         <div class="detail-item">
                             <div class="detail-item-label">Nomor WhatsApp</div>
-                            <div class="detail-item-value">${reg.parent_phone}</div>
+                            <div class="detail-item-value">${reg.parent_phone || '-'}</div>
                         </div>
                         <div class="detail-item">
                             <div class="detail-item-label">Kota Domisili / Asal</div>
@@ -340,7 +418,7 @@ class DjuniorsTracking {
                 </div>
 
                 <!-- Payment Proof & Action Box -->
-                ${this.renderPaymentProofSection(reg)}
+                ${this.renderPaymentProofSection(reg, payment)}
             </div>
 
             <!-- Footer Action Bar -->
@@ -363,9 +441,10 @@ class DjuniorsTracking {
     }
 
     /**
-     * Render Payment & Proof Section (unpaid, pending, paid)
+     * Render Payment & Proof Section (unpaid, pending, paid).
+     * Info pembayaran hanya untuk metode yang dipilih pendaftar.
      */
-    renderPaymentProofSection(reg) {
+    renderPaymentProofSection(reg, payment) {
         if (reg.payment_status === 'paid') {
             return `
                 <div class="payment-proof-box paid">
@@ -427,46 +506,13 @@ class DjuniorsTracking {
                     <div>
                         <h4>${isRejected ? 'Bukti Pembayaran Ditolak - Silakan Unggah Ulang' : 'Selesaikan Pembayaran & Unggah Bukti Transfer'}</h4>
                         <p style="font-size: 0.85rem; color: #64748b; margin: 0;">
-                            ${isRejected ? 'Bukti sebelumnya tidak dapat diverifikasi. Mohon unggah bukti transfer yang jelas dan sesuai.' : 'Silakan lakukan transfer ke salah satu rekening resmi Djuniors, lalu unggah foto/tangkapan layar bukti transfer di bawah ini.'}
+                            ${isRejected ? 'Bukti sebelumnya tidak dapat diverifikasi. Mohon unggah bukti transfer yang jelas dan sesuai.' : 'Silakan lakukan pembayaran sesuai metode yang Anda pilih, lalu unggah foto/tangkapan layar bukti pembayaran di bawah ini.'}
                         </p>
                     </div>
                 </div>
 
-                <!-- Bank Accounts -->
-                <div style="margin-bottom: 1.25rem;">
-                    <div class="bank-account-card">
-                        <div>
-                            <div class="bank-info-name">BCA Syariah</div>
-                            <div class="bank-info-number">8881016052</div>
-                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                        </div>
-                        <button type="button" class="btn-copy" data-copy="8881016052">Salin No. Rekening</button>
-                    </div>
-                    <div class="bank-account-card">
-                        <div>
-                            <div class="bank-info-name">Bank Mandiri</div>
-                            <div class="bank-info-number">1830000895994</div>
-                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                        </div>
-                        <button type="button" class="btn-copy" data-copy="1830000895994">Salin No. Rekening</button>
-                    </div>
-                    <div class="bank-account-card">
-                        <div>
-                            <div class="bank-info-name">Bank BRI</div>
-                            <div class="bank-info-number">105501017176507</div>
-                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                        </div>
-                        <button type="button" class="btn-copy" data-copy="105501017176507">Salin No. Rekening</button>
-                    </div>
-                    <div class="bank-account-card">
-                        <div>
-                            <div class="bank-info-name">DANA Wallet</div>
-                            <div class="bank-info-number">081252218206</div>
-                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                        </div>
-                        <button type="button" class="btn-copy" data-copy="081252218206">Salin No. Rekening/DANA</button>
-                    </div>
-                </div>
+                <!-- Instruksi pembayaran sesuai metode yang dipilih pendaftar -->
+                ${this.renderPaymentInstructionHtml(payment, reg)}
 
                 <!-- Upload Form -->
                 ${this.renderUploadFormHtml(reg)}
@@ -474,16 +520,70 @@ class DjuniorsTracking {
         `;
     }
 
+    /**
+     * Instruksi pembayaran (rekening/e-wallet/QRIS + nominal) — hanya untuk
+     * metode yang dipilih pendaftar.
+     */
+    renderPaymentInstructionHtml(payment, reg) {
+        const amount = Number(payment?.amount ?? reg.final_amount ?? 0) || 0;
+        const nominal = `Rp ${amount.toLocaleString('id-ID')}`;
+
+        if (!payment || !payment.account) {
+            return `
+                <div style="margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc;">
+                    <div style="font-size: 0.85rem; color: #475569;">
+                        ${payment?.instructions || 'Detail pembayaran belum tersedia. Silakan hubungi admin D’Juniors melalui WhatsApp untuk instruksi pembayaran.'}
+                    </div>
+                    <div style="margin-top: 0.5rem; font-weight: 800; color: #1E293B;">Nominal: <span style="color: #FF6B35;">${nominal}</span></div>
+                </div>
+            `;
+        }
+
+        const label = payment.method === 'qris'
+            ? '📱 QRIS Resmi D’Juniors'
+            : payment.method === 'ewallet'
+                ? '💳 Tujuan E-Wallet'
+                : '🏦 Rekening Tujuan Transfer';
+
+        return `
+            <div style="margin-bottom: 1.25rem; padding: 0.9rem 1rem; border-radius: 12px; border: 1px solid #FFD8C2; background: #FFF9F5;">
+                <div style="font-size: 0.78rem; font-weight: 800; color: #FF6B35; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">
+                    ${label} · ${payment.method_label}
+                </div>
+                <div class="bank-account-card">
+                    <div>
+                        <div class="bank-info-name">${payment.account.name}</div>
+                        <div class="bank-info-number">${payment.account.number}</div>
+                        <div class="bank-info-holder">a.n. ${payment.account.holder}</div>
+                    </div>
+                    <button type="button" class="btn-copy" data-copy="${payment.account.number}">Salin Nomor</button>
+                </div>
+                <div style="margin-top: 0.75rem; font-size: 1.05rem; font-weight: 800; color: #1E293B;">
+                    Nominal: <span style="color: #FF6B35;">${nominal}</span>
+                </div>
+                <div style="margin-top: 0.35rem; font-size: 0.78rem; color: #64748b;">
+                    ${payment.instructions}
+                </div>
+            </div>
+        `;
+    }
+
     renderUploadFormHtml(reg) {
+        const currentMethod = reg.payment_method || 'bank_transfer';
+        const methodLabel = currentMethod === 'qris' ? 'QRIS' : (currentMethod === 'ewallet' ? 'E-Wallet' : 'Transfer Bank');
+
         return `
             <form id="payment-upload-form" data-reg-id="${reg.id}" data-reg-number="${reg.registration_number}">
                 <div class="upload-form-group">
                     <label for="payment-method-select">Metode Pembayaran yang Digunakan</label>
                     <select id="payment-method-select" style="width: 100%; padding: 0.8rem 1rem; border: 2px solid #e2e8f0; border-radius: 12px; font-family: 'Nunito', sans-serif;">
-                        <option value="bank_transfer" selected>Transfer Bank (BCA / Mandiri / BRI / Lainnya)</option>
-                        <option value="qris">QRIS</option>
-                        <option value="ewallet">E-Wallet (GoPay / OVO / Dana / ShopeePay)</option>
+                        <option value="bank_transfer" ${currentMethod === 'bank_transfer' ? 'selected' : ''}>Transfer Bank</option>
+                        <option value="qris" ${currentMethod === 'qris' ? 'selected' : ''}>QRIS</option>
+                        <option value="ewallet" ${currentMethod === 'ewallet' ? 'selected' : ''}>E-Wallet</option>
                     </select>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.35rem;">
+                        Terpilih saat pendaftaran: <strong>${methodLabel}</strong>. Ubah hanya bila Anda memakai metode lain.
+                    </div>
                 </div>
 
                 <div class="upload-form-group">
@@ -515,7 +615,6 @@ class DjuniorsTracking {
      * Bind Single Result Event Handlers
      */
     bindSingleResultEvents(reg) {
-        // Copy buttons
         document.querySelectorAll('#view-single-result .btn-copy').forEach(btn => {
             btn.addEventListener('click', () => {
                 const text = btn.dataset.copy;
@@ -533,7 +632,6 @@ class DjuniorsTracking {
             });
         });
 
-        // Toggle re-upload form if in pending state
         const toggleReuploadBtn = document.getElementById('btn-toggle-reupload');
         const reuploadContainer = document.getElementById('reupload-form-container');
         if (toggleReuploadBtn && reuploadContainer) {
@@ -545,7 +643,6 @@ class DjuniorsTracking {
             });
         }
 
-        // File input preview
         const fileInput = document.getElementById('proof-file-input');
         const previewBox = document.getElementById('proof-preview-box');
         const previewImg = document.getElementById('proof-preview-img');
@@ -555,6 +652,11 @@ class DjuniorsTracking {
             fileInput.addEventListener('change', (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('Ukuran file maksimal 5MB. Silakan kompres foto bukti transfer Anda.');
+                        fileInput.value = '';
+                        return;
+                    }
                     this.selectedProofFile = file;
                     if (dropzoneText) dropzoneText.textContent = `File dipilih: ${file.name}`;
 
@@ -571,7 +673,6 @@ class DjuniorsTracking {
             });
         }
 
-        // Upload Form Submit
         const uploadForm = document.getElementById('payment-upload-form');
         if (uploadForm) {
             uploadForm.addEventListener('submit', async (e) => {
@@ -596,7 +697,7 @@ class DjuniorsTracking {
             submitBtn.innerHTML = '⏳ Mengunggah Bukti...';
         }
 
-        const paymentMethod = document.getElementById('payment-method-select')?.value || 'bank_transfer';
+        const paymentMethod = document.getElementById('payment-method-select')?.value || reg.payment_method || 'bank_transfer';
         const notes = document.getElementById('proof-notes')?.value.trim() || 'Bukti bayar diunggah via halaman lacak';
 
         try {
@@ -615,8 +716,8 @@ class DjuniorsTracking {
 
             if (response.ok && data.success) {
                 alert('✅ Bukti pembayaran berhasil diunggah! Status telah diperbarui menjadi Menunggu Verifikasi.');
-                // Re-fetch registration to update UI
-                this.searchByNumber(reg.registration_number);
+                // Muat ulang detail dengan verifikasi yang sama
+                this.searchByNumber(reg.registration_number, (this.searchedPhone || '').slice(-4) || undefined);
             } else {
                 throw new Error(data.message || data.error || 'Gagal mengunggah bukti');
             }
@@ -631,13 +732,15 @@ class DjuniorsTracking {
     }
 
     /**
-     * Render Multiple Registrations for a Phone Number
+     * Render Multiple Registrations (ringkasan terbatas, tanpa data pribadi)
      */
     renderMultiResults(registrations, phone) {
         const titleEl = document.getElementById('multi-result-title');
         const container = document.getElementById('multi-results-container');
         if (titleEl) titleEl.textContent = `Ditemukan ${registrations.length} Pendaftaran untuk Nomor "${phone}":`;
         if (!container) return;
+
+        const digits = String(phone).replace(/\D/g, '');
 
         container.innerHTML = registrations.map(reg => {
             const dateStr = reg.created_at ? new Date(reg.created_at).toLocaleDateString('id-ID', {
@@ -648,11 +751,7 @@ class DjuniorsTracking {
 
             const statusClass = reg.status === 'confirmed' ? 'confirmed' : (reg.status === 'rejected' ? 'rejected' : 'pending');
             const payClass = reg.payment_status === 'paid' ? 'paid' : (reg.payment_status === 'pending' ? 'pending' : 'unpaid');
-
-            let childNames = '';
-            if (Array.isArray(reg.children)) {
-                childNames = reg.children.map(c => c.name).join(', ');
-            }
+            const childCount = Number(reg.children_count) || 1;
 
             return `
                 <div class="reg-card-item" data-reg-number="${reg.registration_number}">
@@ -660,9 +759,9 @@ class DjuniorsTracking {
                         <div style="font-size: 0.775rem; color: #64748b; font-weight: 700;">No. Registrasi: ${reg.registration_number}</div>
                         <h4>${reg.class_name || 'Kelas Djuniors'}</h4>
                         <div class="reg-card-sub">
-                            <span>📅 ${dateStr}</span> • 
-                            <span>⏰ ${reg.schedule_slot || 'Fleksibel'}</span> • 
-                            <span>🧒 ${childNames || '1 Siswa'}</span>
+                            <span>📅 ${dateStr}</span> •
+                            <span>🧒 ${childCount} Siswa</span> •
+                            <span>👤 ${reg.parent_name_masked || '-'}</span>
                         </div>
                         <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                             <span class="status-badge ${statusClass}">Status: ${reg.status}</span>
@@ -681,12 +780,13 @@ class DjuniorsTracking {
             `;
         }).join('');
 
-        // Attach click events on cards
         container.querySelectorAll('.reg-card-item').forEach(card => {
             card.addEventListener('click', () => {
                 const regNum = card.dataset.regNumber;
+                // Nomor WA lengkap sudah diketahui dari pencarian → langsung
+                // dipakai sebagai verifikasi (4 digit terakhir).
                 if (regNum) {
-                    this.searchByNumber(regNum);
+                    this.searchByNumber(regNum, digits.slice(-4));
                 }
             });
         });

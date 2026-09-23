@@ -4,8 +4,13 @@
 // Page-level code splitting: each admin page is loaded on demand via React.lazy
 // so the initial bundle (Login + shell) stays small. See vite.config.ts for
 // vendor / charts / icons chunk splits.
+//
+// Catatan Suspense: fallback TIDAK lagi membungkus seluruh <Routes> — kalau
+// dibungkus di sini, setiap perpindahan menu akan melepas sidebar + header dan
+// menampilkan layar putih "Memuat halaman…". Suspense per-halaman sekarang ada
+// di dalam <Layout> sehingga hanya area konten yang menampilkan skeleton.
 
-import React, { Suspense } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -31,89 +36,70 @@ const Settings = React.lazy(() => import('./pages/Settings'));
 const VerifikasiPembayaran = React.lazy(() => import('./pages/VerifikasiPembayaran'));
 const CSLinks = React.lazy(() => import('./pages/CSLinks'));
 
-// Lightweight inline fallback — keeps bundle small and avoids an extra CSS dep.
-const PageFallback: React.FC = () => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '60vh',
-      color: 'var(--text-secondary, #64748b)',
-      fontSize: '0.95rem',
-    }}
-  >
-    <span>Memuat halaman…</span>
-  </div>
-);
-
 export const App: React.FC = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
-            {/* Public Login Route */}
-            <Route path="/login" element={<Login />} />
+        <Routes>
+          {/* Public Login Route */}
+          <Route path="/login" element={<Login />} />
 
-            {/* Protected Admin Routes */}
+          {/* Protected Admin Routes */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            {/* Verifikasi & Link CS: admin semua data, CS di-scope backend */}
+            <Route path="verifikasi" element={<VerifikasiPembayaran />} />
+            <Route path="cs-links" element={<CSLinks />} />
+            {/* Notifikasi WA: admin mengelola broadcast/template; CS hanya
+                mengelola setelan Fonnte & template notifikasi miliknya. */}
+            <Route path="notifications" element={<Notifications />} />
+            {/* Halaman admin-only (role CS diarahkan ke dashboard) */}
             <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              {/* Verifikasi & Link CS: admin semua data, CS di-scope backend */}
-              <Route path="verifikasi" element={<VerifikasiPembayaran />} />
-              <Route path="cs-links" element={<CSLinks />} />
-              {/* Halaman admin-only (role CS diarahkan ke dashboard) */}
-              <Route
-                path="levels"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Levels /></RoleRoute>}
-              />
-              <Route
-                path="classes"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Classes /></RoleRoute>}
-              />
-              <Route path="registrations" element={<Registrations />} />
-              <Route
-                path="participants"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Participants /></RoleRoute>}
-              />
-              {/* Redirects for legacy routes */}
-              <Route path="students" element={<Navigate to="/participants" replace />} />
-              <Route path="enrollments" element={<Navigate to="/registrations" replace />} />
-              <Route path="payments" element={<Navigate to="/registrations" replace />} />
-              <Route
-                path="promos"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Promos /></RoleRoute>}
-              />
-              <Route
-                path="forms"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Forms /></RoleRoute>}
-              />
-              <Route
-                path="notifications"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Notifications /></RoleRoute>}
-              />
-              <Route
-                path="cms"
-                element={<RoleRoute roles={['admin', 'super_admin']}><CMS /></RoleRoute>}
-              />
-              <Route
-                path="settings"
-                element={<RoleRoute roles={['admin', 'super_admin']}><Settings /></RoleRoute>}
-              />
-            </Route>
+              path="levels"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Levels /></RoleRoute>}
+            />
+            <Route
+              path="classes"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Classes /></RoleRoute>}
+            />
+            <Route path="registrations" element={<Registrations />} />
+            <Route
+              path="participants"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Participants /></RoleRoute>}
+            />
+            {/* Redirects for legacy routes */}
+            <Route path="students" element={<Navigate to="/participants" replace />} />
+            <Route path="enrollments" element={<Navigate to="/registrations" replace />} />
+            <Route path="payments" element={<Navigate to="/registrations" replace />} />
+            <Route
+              path="promos"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Promos /></RoleRoute>}
+            />
+            <Route
+              path="forms"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Forms /></RoleRoute>}
+            />
+            <Route
+              path="cms"
+              element={<RoleRoute roles={['admin', 'super_admin']}><CMS /></RoleRoute>}
+            />
+            <Route
+              path="settings"
+              element={<RoleRoute roles={['admin', 'super_admin']}><Settings /></RoleRoute>}
+            />
+          </Route>
 
-            {/* Catch-all redirect */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   );

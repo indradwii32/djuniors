@@ -51,9 +51,19 @@ export interface CsOverview {
   ref_code: string;
   total: number;
   paid: number;
+  /** Nominal hanya terisi untuk admin — role CS tidak melihat nilai uang. */
   revenue: number;
   verifying: number;
   pending_verification: number;
+  /** Rincian jumlah pendaftaran per kelas (untuk generator link per-kelas). */
+  by_class?: CsClassStat[];
+}
+
+export interface CsClassStat {
+  class_id: string;
+  class_name: string;
+  total: number;
+  paid: number;
 }
 
 export interface LoginResponse {
@@ -253,6 +263,8 @@ export interface BankAccount {
   bank_name: string;
   account_number: string;
   account_name: string;
+  /** 'bank' | 'ewallet' | 'qris' — menentukan detail pembayaran per metode. */
+  type?: 'bank' | 'ewallet' | 'qris' | string;
   is_active: boolean | number;
   created_at?: string;
 }
@@ -349,6 +361,14 @@ export const API_BASE_URL = API_BASE;
 // jadi localhost/origin dev tidak akan pernah bisa dibuka orang tua.
 export const buildRefLink = (refCode: string): string =>
   `https://djuniorslc.com/daftar.html?ref=${encodeURIComponent(refCode)}`;
+
+/**
+ * Link pendaftaran per-kelas milik satu CS.
+ * Form pendaftaran akan mengunci pilihan kelas/level sesuai `class` sehingga
+ * pendaftar tinggal memilih jam & jadwal.
+ */
+export const buildClassRefLink = (refCode: string, classId: string): string =>
+  `https://djuniorslc.com/daftar.html?ref=${encodeURIComponent(refCode)}&class=${encodeURIComponent(classId)}`;
 
 export async function apiRequest<T>(
   endpoint: string,
@@ -826,12 +846,13 @@ export const paymentsApi = {
     bank_name: string;
     account_number: string;
     account_name: string;
+    type?: 'bank' | 'ewallet' | 'qris';
   }): Promise<{ success: boolean; bank: BankAccount; message?: string }> => {
     return apiRequest('/payments/banks', { method: 'POST', body: JSON.stringify(data) });
   },
   updateBank: async (
     id: string,
-    data: Partial<Pick<BankAccount, 'bank_name' | 'account_number' | 'account_name' | 'is_active'>>
+    data: Partial<Pick<BankAccount, 'bank_name' | 'account_number' | 'account_name' | 'is_active' | 'type'>>
   ): Promise<{ success: boolean; bank: BankAccount; message?: string }> => {
     return apiRequest(`/payments/banks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   },

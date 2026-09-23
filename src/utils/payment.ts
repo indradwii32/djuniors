@@ -24,6 +24,203 @@ export async function getBankAccountById(db: D1Database, id: string): Promise<Ba
     return result as BankAccount | null;
 }
 
+// ============================================
+// Info pembayaran (metode → rekening yang sesuai)
+// ============================================
+// Detail pembayaran hanya ditampilkan SETELAH pendaftaran dibuat, dan hanya
+// untuk metode yang benar-benar dipilih pendaftar. Rekening default per metode
+// dipilih server-side (bukan dari client) agar tidak bisa dipalsukan.
+
+export type PaymentMethod = 'bank_transfer' | 'ewallet' | 'qris';
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+    bank_transfer: 'Transfer Bank',
+    ewallet: 'E-Wallet',
+    qris: 'QRIS',
+};
+
+/** Normalisasi input metode pembayaran apa pun ke salah satu metode resmi. */
+export function normalizePaymentMethod(value: unknown): PaymentMethod {
+    const v = String(value || '').trim().toLowerCase();
+    if (v === 'qris') return 'qris';
+    if (v === 'ewallet' || v === 'e-wallet' || v === 'wallet' || v === 'dana') return 'ewallet';
+    return 'bank_transfer';
+}
+
+/** Tipe akun pembayaran yang dipakai tiap metode. */
+function accountTypeForMethod(method: PaymentMethod): 'bank' | 'ewallet' | 'qris' {
+    if (method === 'qris') return 'qris';
+    if (method === 'ewallet') return 'ewallet';
+    return 'bank';
+}
+
+/**
+ * Ambil rekening default untuk sebuah metode pembayaran.
+ *
+ * Urutan: akun aktif bertipe sesuai metode → (khusus transfer bank) akun aktif
+ * apa pun sebagai fallback data lama yang belum punya kolom `type`.
+ */
+export async function getDefaultPaymentAccount(
+    db: D1Database,
+    method: PaymentMethod
+): Promise<BankAccount | null> {
+    const wanted = accountTypeForMethod(method);
+    const typed = await db.prepare(
+        `SELECT * FROM bank_accounts
+          WHERE is_active = 1 AND COALESCE(type, 'bank') = ?
+          ORDER BY created_at ASC LIMIT 1`
+    ).bind(wanted).first();
+    if (typed) return typed as unknown as BankAccount;
+
+    if (method === 'bank_transfer') {
+        const fallback = await db.prepare(
+            'SELECT * FROM bank_accounts WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1'
+        ).first();
+        return (fallback as unknown as BankAccount) || null;
+    }
+    return null;
+}
+
+export interface PaymentInfo {
+    method: PaymentMethod;
+    method_label: string;
+    amount: number;
+    account: { name: string; number: string; holder: string } | null;
+    instructions: string;
+}
+
+/**
+ * Susun info pembayaran lengkap (metode + rekening + nominal + instruksi)
+ * yang aman dikirim ke halaman publik/popup pendaftaran.
+ */
+export function buildPaymentInfo(params: {
+    method: unknown;
+    amount: number;
+    account: { bank_name?: string | null; account_number?: string | null; account_name?: string | null } | null;
+    registrationNumber?: string | null;
+}): PaymentInfo {
+    const method = normalizePaymentMethod(params.method);
+    const amount = Math.max(0, Number(params.amount) || 0);
+    const acc = params.account;
+    const hasAccount = Boolean(acc && (acc.account_number || acc.bank_name));
+
+    const account = hasAccount
+        ? {
+            name: String(acc!.bank_name || ''),
+            number: String(acc!.account_number || ''),
+            holder: String(acc!.account_name || ''),
+        }
+        : null;
+
+    const nominal = `Rp ${amount.toLocaleString('id-ID')}`;
+    let instructions: string;
+    if (!hasAccount) {
+        instructions =
+            'Detail pembayaran belum tersedia. Silakan hubungi admin D’Juniors untuk instruksi transfer.';
+    } else if (method === 'qris') {
+        instructions = `Scan QRIS resmi D’Juniors sebesar ${nominal}, lalu unggah bukti pembayaran Anda.`;
+    } else if (method === 'ewallet') {
+        instructions = `Kirim saldo ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.`;
+    } else {
+        instructions = `Transfer ${nominal} ke ${account!.name} ${account!.number} (a.n. ${account!.holder}), lalu unggah bukti pembayaran Anda.`;
+    }
+
+    return {
+        method,
+        method_label: PAYMENT_METHOD_LABELS[method],
+        amount,
+        account,
+        instructions,
+    };
+}
+
+/** Masking nomor telepon untuk tampilan publik: 0812****8206 */
+export function maskPhone(phone: unknown): string {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (digits.length < 7) return digits ? '****' : '-';
+    return `${digits.slice(0, 4)}****${digits.slice(-3)}`;
+}
+
+// ============================================
+// Metode pembayaran yang diatur admin
+// ============================================
+// Admin "mengatur" metode pembayaran dengan menambahkan rekening bertipe
+// bank / ewallet / qris di Pengaturan Sistem → Rekening. Pendaftar hanya boleh
+// memilih dari metode yang benar-benar tersedia, dan info pembayaran yang
+// tampil mengikuti pilihan mereka.
+
+export interface PaymentMethodOption {
+    method: PaymentMethod;
+    label: string;
+    icon: string;
+}
+
+const METHOD_ICONS: Record<PaymentMethod, string> = {
+    bank_transfer: '🏦',
+    ewallet: '💳',
+    qris: '📱',
+};
+
+/** Urutan tampil metode di form pendaftaran. */
+const METHOD_ORDER: PaymentMethod[] = ['bank_transfer', 'ewallet', 'qris'];
+
+function toOption(method: PaymentMethod): PaymentMethodOption {
+    return { method, label: PAYMENT_METHOD_LABELS[method], icon: METHOD_ICONS[method] };
+}
+
+/**
+ * Daftar metode pembayaran yang aktif (punya minimal satu akun aktif).
+ * Bila admin belum mengatur satu pun rekening, kembalikan Transfer Bank sebagai
+ * default agar alur pendaftaran tidak buntu (server akan memakai fallback akun
+ * pertama yang aktif, atau memberi instruksi "hubungi admin").
+ */
+export async function getAvailablePaymentMethods(db: D1Database): Promise<PaymentMethodOption[]> {
+    const rows = await db.prepare(
+        `SELECT DISTINCT COALESCE(type, 'bank') AS type
+           FROM bank_accounts
+          WHERE is_active = 1`
+    ).all();
+
+    const available = new Set((rows.results || []).map((r: any) => String(r.type)));
+    const options = METHOD_ORDER
+        .filter((method) => available.has(accountTypeForMethod(method)))
+        .map(toOption);
+
+    return options.length > 0 ? options : [toOption('bank_transfer')];
+}
+
+/** Apakah sebuah metode pembayaran punya akun aktif (siap dipakai pendaftar)? */
+export async function isPaymentMethodAvailable(
+    db: D1Database,
+    method: PaymentMethod
+): Promise<boolean> {
+    const row = await db.prepare(
+        `SELECT id FROM bank_accounts
+          WHERE is_active = 1 AND COALESCE(type, 'bank') = ?
+          LIMIT 1`
+    ).bind(accountTypeForMethod(method)).first();
+    return Boolean(row);
+}
+
+/**
+ * Pilih metode pembayaran efektif untuk sebuah pendaftaran.
+ * Metode pilihan pendaftar dipakai bila tersedia; kalau tidak (mis. admin baru
+ * menonaktifkan rekeningnya), jatuh ke metode pertama yang tersedia agar
+ * pendaftaran tidak gagal.
+ */
+export async function resolvePaymentMethod(
+    db: D1Database,
+    requested: unknown
+): Promise<{ method: PaymentMethod; adjusted: boolean }> {
+    const wanted = normalizePaymentMethod(requested);
+    if (await isPaymentMethodAvailable(db, wanted)) {
+        return { method: wanted, adjusted: false };
+    }
+    const options = await getAvailablePaymentMethods(db);
+    const fallback = options[0]?.method || 'bank_transfer';
+    return { method: fallback, adjusted: fallback !== wanted };
+}
+
 /**
  * Generate payment instruction message
  */

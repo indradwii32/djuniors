@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     bank_account_id TEXT,
     bank_name TEXT,
     bank_account_number TEXT,
+    bank_account_name TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -144,6 +145,9 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     bank_name TEXT NOT NULL,
     account_number TEXT NOT NULL,
     account_name TEXT NOT NULL,
+    -- 'bank' | 'ewallet' | 'qris' — detail pembayaran yang ditampilkan ke
+    -- pendaftar mengikuti metode yang mereka pilih.
+    type TEXT NOT NULL DEFAULT 'bank',
     is_active BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -101,6 +101,7 @@ export interface Registration {
     bank_account_id?: string | null;
     bank_name?: string | null;
     bank_account_number?: string | null;
+    bank_account_name?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -176,9 +177,15 @@ export interface BankAccount {
     bank_name: string;
     account_number: string;
     account_name: string;
+    // 'bank' | 'ewallet' | 'qris' — menentukan metode pembayaran mana yang
+    // memakai rekening ini saat menampilkan detail pembayaran ke pendaftar.
+    type?: PaymentAccountType;
     is_active: boolean;
     created_at: string;
 }
+
+/** Jenis akun pembayaran manual yang didukung. */
+export type PaymentAccountType = 'bank' | 'ewallet' | 'qris';
 
 export interface JWTPayload {
     userId: string;

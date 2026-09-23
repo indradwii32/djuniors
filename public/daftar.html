@@ -36,7 +36,7 @@
                 <li><a href="index.html#features">Fitur</a></li>
                 <li><a href="index.html#classes">Pilihan Kelas</a></li>
                 <li><a href="lacak.html">Lacak Pendaftaran</a></li>
-                <li><a href="login.html" class="btn-nav">Login</a></li>
+                <li><a href="daftar.html" class="btn-nav">Daftar Sekarang</a></li>
             </ul>
         </div>
     </nav>
@@ -86,6 +86,11 @@
                         
                         <!-- Filter Level / Jenjang Kelas -->
                         <div class="level-filter-container" id="level-filter-container"></div>
+
+                        <!-- Info kelas terkunci (link per-kelas dari CS) -->
+                        <div class="hidden" id="locked-class-notice" style="margin-bottom: 1rem; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid #DDD6FE; background: #FAF5FF; font-size: 0.85rem; color: #5B21B6; font-weight: 700;">
+                            🔒 Kelas Anda sudah ditentukan: <span id="locked-class-name"></span> — silakan pilih jam &amp; jadwal belajar di bawah.
+                        </div>
 
                         <div class="class-options" id="class-options">
                             <p class="form-info" style="grid-column: 1/-1;">Memuat pilihan kelas...</p>
@@ -233,72 +238,21 @@
                             <!-- Payment Method Selector -->
                             <div>
                                 <div class="summary-card-title">Metode Pembayaran</div>
-                                <div class="payment-methods-grid">
-                                    <div class="payment-method-card active" data-method="bank_transfer">
-                                        <div class="payment-method-icon">🏦</div>
-                                        <div class="payment-method-name">Transfer Bank</div>
-                                    </div>
-                                    <div class="payment-method-card" data-method="qris">
-                                        <div class="payment-method-icon">📱</div>
-                                        <div class="payment-method-name">QRIS</div>
-                                    </div>
-                                    <div class="payment-method-card" data-method="ewallet">
-                                        <div class="payment-method-icon">💳</div>
-                                        <div class="payment-method-name">E-Wallet</div>
-                                    </div>
+                                <div class="payment-methods-grid" id="payment-methods-grid">
+                                    <p class="form-info" style="grid-column: 1/-1; margin: 0;">Memuat metode pembayaran...</p>
                                 </div>
 
-                                <!-- Bank Details Box -->
-                                <div class="payment-details-box" id="bank-transfer-details">
-                                    <div style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.75rem;">
-                                        Silakan transfer ke salah satu rekening resmi D’Juniors (a.n. Wahyu Adi Syahputra):
-                                    </div>
-                                    <div class="bank-account-card">
-                                        <div>
-                                            <div class="bank-info-name">BCA Syariah</div>
-                                            <div class="bank-info-number">8881016052</div>
-                                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                                        </div>
-                                        <button type="button" class="btn-copy" data-copy="8881016052">Salin Rekening</button>
-                                    </div>
-                                    <div class="bank-account-card">
-                                        <div>
-                                            <div class="bank-info-name">Bank Mandiri</div>
-                                            <div class="bank-info-number">1830000895994</div>
-                                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                                        </div>
-                                        <button type="button" class="btn-copy" data-copy="1830000895994">Salin Rekening</button>
-                                    </div>
-                                    <div class="bank-account-card">
-                                        <div>
-                                            <div class="bank-info-name">Bank BRI</div>
-                                            <div class="bank-info-number">105501017176507</div>
-                                            <div class="bank-info-holder">a.n. Wahyu Adi Syahputra</div>
-                                        </div>
-                                        <button type="button" class="btn-copy" data-copy="105501017176507">Salin Rekening</button>
-                                    </div>
-                                </div>
-
-                                <div class="payment-details-box hidden" id="qris-details">
+                                <!-- Detail nomor rekening / e-wallet / QRIS sengaja
+                                     TIDAK ditampilkan di sini. Info pembayaran lengkap
+                                     (nomor tujuan + nominal) muncul setelah pendaftaran
+                                     dikirim, di popup "Pendaftaran Berhasil" dan di
+                                     halaman Lacak Status. -->
+                                <div class="payment-details-box" id="payment-after-submit-note">
                                     <div style="font-size: 0.85rem; color: #475569; text-align: center;">
-                                        QRIS instan dapat di-scan via GoPay, OVO, Dana, ShopeePay, BCA Mobile, Livin, dll. Kode QRIS dan tombol unggah bukti bayar akan tersedia setelah pendaftaran dibuat.
+                                        🔒 <strong>Detail nomor rekening / e-wallet / QRIS beserta nominal transfer</strong>
+                                        akan ditampilkan setelah pendaftaran dikirim, di halaman konfirmasi pendaftaran berhasil
+                                        dan di halaman <em>Lacak Status</em> — sesuai metode pembayaran yang Anda pilih di atas.
                                     </div>
-                                </div>
-
-                                <div class="payment-details-box hidden" id="ewallet-details">
-                                    <div style="font-size: 0.85rem; color: #475569; text-align: center;">
-                                        Mendukung transfer saldo DANA Wallet ke nomor: <strong>081252218206</strong> (a.n. Wahyu Adi Syahputra).
-                                    </div>
-                                </div>
-
-                                <!-- Ringkasan rekening terpilih — tampil di step terakhir,
-                                     tepat sebelum tombol konfirmasi pendaftaran (diisi JS) -->
-                                <div class="payment-details-box" id="selected-bank-summary" style="display: none; border-color: #FF6B35; background: #FFF9F5;">
-                                    <div style="font-size: 0.78rem; font-weight: 800; color: #FF6B35; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">
-                                        🏦 Rekening Tujuan Transfer (terpilih)
-                                    </div>
-                                    <div id="selected-bank-main" style="margin-bottom: 0.6rem;"></div>
-                                    <button type="button" class="btn-copy" id="selected-bank-copy" data-copy="">Salin Nomor Rekening</button>
                                 </div>
                             </div>
 
@@ -352,6 +306,18 @@
                 <p style="margin: 0.5rem 0 0; font-size: 0.8rem; color: #64748b;">
                     Silakan simpan nomor registrasi di atas untuk melacak status pembayaran dan mengakses link Google Meet kelas live.
                 </p>
+                <p id="modal-payment-adjusted-note" style="display: none; margin: 0.5rem 0 0; font-size: 0.78rem; color: #B45309; font-weight: 700;"></p>
+            </div>
+
+            <!-- Info pembayaran lengkap: nomor rekening/e-wallet/QRIS + nominal,
+                 hanya untuk metode yang dipilih (diisi JS setelah submit) -->
+            <div class="payment-details-box" id="modal-payment-info" style="display: none; text-align: left; margin-bottom: 1.25rem; border-color: #FF6B35; background: #FFF9F5;">
+                <div style="font-size: 0.78rem; font-weight: 800; color: #FF6B35; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.6rem;">
+                    💳 Instruksi Pembayaran
+                </div>
+                <div id="modal-payment-account" style="margin-bottom: 0.6rem;"></div>
+                <div id="modal-payment-instructions" style="font-size: 0.82rem; color: #64748b; margin-bottom: 0.75rem;"></div>
+                <button type="button" class="btn-copy" id="modal-payment-copy" data-copy="">📋 Salin Nomor Tujuan Transfer</button>
             </div>
 
             <div class="success-actions">
@@ -368,6 +334,6 @@
         </div>
     </div>
 
-    <script src="js/registration.js?v=20260923"></script>
+    <script src="js/registration.js?v=20260923c"></script>
 </body>
 </html>

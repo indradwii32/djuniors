@@ -54,12 +54,17 @@ class DjuniorsRegistration {
         this.classes = [];
         this.selectedClass = null;
         this.selectedSlot = null;
-        this.selectedPaymentMethod = 'bank_transfer';
         this.currentLevelFilter = 'all';
 
-        // Rekening bank — diambil dari API (bukan hardcoded), bisa dipilih
-        this.banks = [];
-        this.selectedBank = null;
+        // Bila link memakai ?class= (link per-kelas dari CS), kelas & level
+        // dikunci: pendaftar hanya memilih jam/jadwal.
+        this.lockedClassId = null;
+
+        // Metode pembayaran yang diatur admin (dari API) — kartu metode di form
+        // hanya menampilkan yang tersedia, dan yang terpilih dipakai untuk
+        // menampilkan instruksi pembayaran setelah pendaftaran dikirim.
+        this.paymentMethods = [];
+        this.selectedPaymentMethod = null;
 
         this.children = [
             { name: '', age_or_class: '' }
@@ -85,7 +90,9 @@ class DjuniorsRegistration {
 
     async init() {
         this.bindEvents();
-        await Promise.all([this.fetchClasses(), this.fetchBanks()]);
+        // Metode pembayaran dimuat lebih dulu supaya kartu metode sudah siap
+        // saat pendaftar masuk ke step pembayaran.
+        await Promise.all([this.fetchClasses(), this.fetchPaymentMethods()]);
     }
 
     bindEvents() {
@@ -116,13 +123,16 @@ class DjuniorsRegistration {
             }
         });
 
-        // Payment Method Cards
-        document.querySelectorAll('.payment-method-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const method = card.dataset.method;
-                this.selectPaymentMethod(method);
+        // Payment Method Cards (kartu dibuat dinamis dari metode yang diatur
+        // admin → pakai event delegation pada container).
+        const methodsGrid = document.getElementById('payment-methods-grid');
+        if (methodsGrid) {
+            methodsGrid.addEventListener('click', (e) => {
+                const card = e.target.closest('.payment-method-card');
+                if (!card || !card.dataset.method) return;
+                this.selectPaymentMethod(card.dataset.method);
             });
-        });
+        }
 
         // Copy Account Numbers
         document.querySelectorAll('.btn-copy').forEach(btn => {
@@ -200,6 +210,11 @@ class DjuniorsRegistration {
                 const matchedClass = this.classes.find(c => c.id === targetClassId);
                 if (matchedClass) {
                     targetLevelId = matchedClass.level_id || targetLevelId;
+                    // Link per-kelas (dari generator link CS) → kunci kelas ini.
+                    this.lockedClassId = matchedClass.id;
+                } else {
+                    // Kelas tidak dikenal → abaikan parameter, kembali normal.
+                    targetClassId = null;
                 }
             } else if (targetLevelId) {
                 const matched = this.classes.find(c => c.level_id === targetLevelId);
@@ -211,7 +226,7 @@ class DjuniorsRegistration {
             // Set current level filter (auto-filtered if level or class was selected from landing)
             this.currentLevelFilter = targetLevelId || 'all';
 
-            // Render Level filter pills
+            // Render Level filter pills (disembunyikan bila kelas dikunci)
             this.renderLevelFilter();
 
             // Render classes (filtered by currentLevelFilter)
@@ -226,6 +241,14 @@ class DjuniorsRegistration {
             if (targetClassId) {
                 this.selectClass(targetClassId);
             }
+
+            // Info bahwa kelas sudah terkunci oleh link
+            if (this.lockedClassId) {
+                const notice = document.getElementById('locked-class-notice');
+                const noticeName = document.getElementById('locked-class-name');
+                if (notice) notice.classList.remove('hidden');
+                if (noticeName) noticeName.textContent = this.selectedClass?.name || '';
+            }
         } catch (error) {
             console.error('Error fetching classes:', error);
             if (container) {
@@ -235,124 +258,53 @@ class DjuniorsRegistration {
     }
 
     /**
-     * Ambil daftar rekening aktif dari database (API /payments/banks/list).
-     * Bila gagal/kosong, HTML statis di daftar.html dipertahankan sebagai fallback.
+     * Ambil metode pembayaran yang DIATUR ADMIN (API /payments/methods).
+     * Hanya metode yang punya rekening aktif yang ditampilkan, sehingga
+     * pendaftar tidak pernah memilih metode yang tidak bisa dipakai.
      */
-    async fetchBanks() {
+    async fetchPaymentMethods() {
+        const grid = document.getElementById('payment-methods-grid');
         try {
-            const response = await fetch(`${API_BASE}/api/payments/banks/list`);
-            if (!response.ok) throw new Error('Gagal mengambil data rekening');
+            const response = await fetch(`${API_BASE}/api/payments/methods`);
+            if (!response.ok) throw new Error('Gagal mengambil metode pembayaran');
             const data = await response.json();
-            if (Array.isArray(data) && data.length > 0) {
-                this.banks = data;
-                this.renderBanks();
-            }
+            const methods = Array.isArray(data?.methods) ? data.methods : [];
+            if (methods.length === 0) throw new Error('Metode pembayaran kosong');
+            this.paymentMethods = methods;
+            this.renderPaymentMethods();
         } catch (error) {
-            console.warn('Bank list tidak tersedia, memakai data statis:', error);
+            // Fallback aman: transfer bank (server tetap menentukan rekening).
+            console.warn('Metode pembayaran tidak tersedia, memakai Transfer Bank:', error);
+            this.paymentMethods = [{ method: 'bank_transfer', label: 'Transfer Bank', icon: '🏦' }];
+            this.renderPaymentMethods();
+            if (grid) {
+                grid.insertAdjacentHTML('afterend',
+                    '<p class="form-info" style="margin: 0.5rem 0 0;">Sebagian metode pembayaran gagal dimuat. Silakan muat ulang halaman bila metode Anda tidak muncul.</p>');
+            }
         }
     }
 
     /**
-     * Render kartu rekening yang bisa dipilih di step 4
+     * Render kartu metode pembayaran sesuai setelan admin, lalu pilih yang pertama.
      */
-    renderBanks() {
-        const container = document.getElementById('bank-transfer-details');
-        if (!container || !Array.isArray(this.banks) || this.banks.length === 0) return;
+    renderPaymentMethods() {
+        const grid = document.getElementById('payment-methods-grid');
+        if (!grid) return;
 
-        const holder = this.banks[0].account_name || 'Wahyu Adi Syahputra';
-        container.innerHTML = `
-            <div style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.75rem;">
-                Silakan transfer ke salah satu rekening resmi D&rsquo;Juniors (a.n. ${this.escapeHtml(holder)}) — <em>klik untuk memilih rekening tujuan</em>:
-            </div>
-            <div class="bank-options" id="bank-options">
-                ${this.banks.map((bank) => `
-                    <div class="bank-option" data-bank-id="${this.escapeHtml(bank.id)}" style="cursor: pointer;">
-                        <div class="bank-account-card" data-bank-card="${this.escapeHtml(bank.id)}" style="transition: all 0.15s ease; border: 2px solid #E2E8F0;">
-                            <div>
-                                <div class="bank-info-name">${this.escapeHtml(bank.bank_name)}</div>
-                                <div class="bank-info-number">${this.escapeHtml(bank.account_number)}</div>
-                                <div class="bank-info-holder">a.n. ${this.escapeHtml(bank.account_name)}</div>
-                            </div>
-                            <button type="button" class="btn-copy" data-copy="${this.escapeHtml(bank.account_number)}">Salin Rekening</button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-
-        container.querySelectorAll('.bank-option').forEach((opt) => {
-            opt.addEventListener('click', (e) => {
-                // Klik tombol salin tidak ikut mengubah pilihan
-                if (e.target && e.target.classList && e.target.classList.contains('btn-copy')) return;
-                this.selectBank(opt.dataset.bankId);
-            });
-        });
-
-        // Tombol salin dinamis (tombol statis sudah di-bind di bindEvents)
-        container.querySelectorAll('.btn-copy').forEach((btn) => {
-            if (btn.dataset.bound === '1') return;
-            btn.dataset.bound = '1';
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const textToCopy = btn.dataset.copy;
-                if (!textToCopy) return;
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    const originalText = btn.textContent;
-                    btn.textContent = '✓ Tersalin!';
-                    setTimeout(() => { btn.textContent = originalText; }, 2000);
-                });
-            });
-        });
-
-        // Default: rekening pertama langsung terpilih
-        this.selectBank(this.banks[0].id);
-    }
-
-    /**
-     * Pilih rekening tujuan + tampilkan ringkasan di step terakhir
-     * (tepat sebelum tombol konfirmasi/kirim pendaftaran).
-     */
-    selectBank(bankId) {
-        const bank = this.banks.find((b) => b.id === bankId);
-        if (!bank) return;
-        this.selectedBank = bank;
-
-        document.querySelectorAll('[data-bank-card]').forEach((card) => {
-            const active = card.getAttribute('data-bank-card') === bankId;
-            card.style.borderColor = active ? '#FF6B35' : '#E2E8F0';
-            card.style.boxShadow = active ? '0 4px 14px rgba(255, 107, 53, 0.25)' : 'none';
-            card.style.backgroundColor = active ? '#FFF9F5' : '#FFFFFF';
-        });
-
-        this.updateSelectedBankSummary();
-    }
-
-    /**
-     * Update box "Rekening Tujuan Transfer (terpilih)" — hanya untuk metode
-     * bank transfer; disembunyikan untuk QRIS / E-Wallet.
-     */
-    updateSelectedBankSummary() {
-        const box = document.getElementById('selected-bank-summary');
-        const main = document.getElementById('selected-bank-main');
-        if (!box || !main) return;
-
-        if (!this.selectedBank || this.selectedPaymentMethod !== 'bank_transfer') {
-            box.style.display = 'none';
+        if (!Array.isArray(this.paymentMethods) || this.paymentMethods.length === 0) {
+            grid.innerHTML = '<p class="form-info" style="grid-column: 1/-1; margin: 0;">Belum ada metode pembayaran aktif. Hubungi admin D’Juniors.</p>';
             return;
         }
 
-        main.innerHTML = `
-            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;">
-                <span style="font-weight: 800; color: #1E293B; font-size: 1rem;">${this.escapeHtml(this.selectedBank.bank_name)}</span>
-                <span style="font-family: monospace; font-size: 1.2rem; font-weight: 800; color: #FF6B35; letter-spacing: 1.5px;">${this.escapeHtml(this.selectedBank.account_number)}</span>
+        grid.innerHTML = this.paymentMethods.map((m) => `
+            <div class="payment-method-card" data-method="${this.escapeHtml(m.method)}">
+                <div class="payment-method-icon">${m.icon || '💳'}</div>
+                <div class="payment-method-name">${this.escapeHtml(m.label || m.method)}</div>
             </div>
-            <div style="font-size: 0.82rem; color: #64748b;">a.n. ${this.escapeHtml(this.selectedBank.account_name)}</div>
-        `;
+        `).join('');
 
-        const copyBtn = document.getElementById('selected-bank-copy');
-        if (copyBtn) copyBtn.setAttribute('data-copy', this.selectedBank.account_number);
-
-        box.style.display = 'block';
+        // Default: metode pertama yang tersedia.
+        this.selectPaymentMethod(this.paymentMethods[0].method);
     }
 
     /**
@@ -371,6 +323,14 @@ class DjuniorsRegistration {
     renderLevelFilter() {
         const filterContainer = document.getElementById('level-filter-container');
         if (!filterContainer) return;
+
+        // Kelas dikunci oleh link per-kelas (?class=) → filter level tidak perlu.
+        if (this.lockedClassId) {
+            filterContainer.innerHTML = '';
+            filterContainer.style.display = 'none';
+            return;
+        }
+        filterContainer.style.display = '';
 
         // Group unique levels from classes
         const levelMap = new Map();
@@ -462,6 +422,39 @@ class DjuniorsRegistration {
     renderClasses() {
         const container = document.getElementById('class-options');
         if (!container) return;
+
+        // Kelas dikunci oleh link per-kelas: hanya tampilkan kelas tersebut dan
+        // tidak bisa diganti (pendaftar tinggal memilih jam & jadwal).
+        if (this.lockedClassId) {
+            const locked = this.classes.find(c => c.id === this.lockedClassId);
+            if (locked) {
+                const icon = getClassIcon(locked);
+                const heroSvg = getClassFallbackSvg(locked);
+                const classImgUrl = resolveMediaUrl(locked.image_url) || heroSvg;
+                const priceFormatted = Number(locked.price) === 0
+                    ? 'Gratis'
+                    : `Rp ${Number(locked.price).toLocaleString('id-ID')} / bln`;
+
+                container.innerHTML = `
+                    <label class="class-option class-option-locked" style="grid-column: 1/-1; cursor: default;">
+                        <input type="radio" name="class_id" value="${locked.id}" checked style="display: none;">
+                        <div class="class-card-select" style="border: 2px solid #6D28D9; background: #FAF5FF;">
+                            <div class="class-select-hero">
+                                <img src="${classImgUrl}" alt="${locked.name}" onerror="this.onerror=null; this.src='${heroSvg}';">
+                            </div>
+                            <div class="class-name">${icon} ${locked.name}</div>
+                            <div class="class-level-badge">${locked.level_name ? `Level ${locked.level_name}` : 'Semua Tingkat'}</div>
+                            <div class="class-price">${priceFormatted}</div>
+                            <div class="class-desc">${locked.description || 'Live interaktif via Google Meet'}</div>
+                            <div style="margin-top: 0.5rem; font-size: 0.78rem; font-weight: 800; color: #6D28D9;">
+                                🔒 Kelas sudah ditentukan oleh link pendaftaran Anda
+                            </div>
+                        </div>
+                    </label>
+                `;
+                return;
+            }
+        }
 
         const visibleClasses = this.getVisibleClasses();
 
@@ -774,24 +767,22 @@ class DjuniorsRegistration {
 
     /**
      * Select Payment Method
+     *
+     * Step pembayaran hanya menampilkan PILIHAN metode. Detail nomor
+     * rekening/e-wallet/QRIS + nominal baru muncul setelah pendaftaran
+     * dikirim (popup sukses) atau di halaman Lacak Status.
      */
     selectPaymentMethod(method) {
+        // Hanya terima metode yang benar-benar tersedia (diatur admin).
+        const available = Array.isArray(this.paymentMethods) ? this.paymentMethods : [];
+        if (available.length > 0 && !available.some((m) => m.method === method)) {
+            return;
+        }
         this.selectedPaymentMethod = method;
 
         document.querySelectorAll('.payment-method-card').forEach(card => {
             card.classList.toggle('active', card.dataset.method === method);
         });
-
-        const bankDetails = document.getElementById('bank-transfer-details');
-        const qrisDetails = document.getElementById('qris-details');
-        const ewalletDetails = document.getElementById('ewallet-details');
-
-        if (bankDetails) bankDetails.classList.toggle('hidden', method !== 'bank_transfer');
-        if (qrisDetails) qrisDetails.classList.toggle('hidden', method !== 'qris');
-        if (ewalletDetails) ewalletDetails.classList.toggle('hidden', method !== 'ewallet');
-
-        // Ringkasan rekening terpilih hanya relevan untuk transfer bank
-        this.updateSelectedBankSummary();
     }
 
     /**
@@ -825,8 +816,6 @@ class DjuniorsRegistration {
         }
 
         this.recalculatePrice();
-        // Pastikan ringkasan rekening terpilih tampil di step terakhir
-        this.updateSelectedBankSummary();
     }
 
     /**
@@ -988,15 +977,10 @@ class DjuniorsRegistration {
             schedule_slot: this.selectedSlot || 'Jadwal Fleksibel',
             children: this.children,
             promo_code: this.promo.applied ? this.promo.code : null,
-            payment_method: this.selectedPaymentMethod,
+            payment_method: this.selectedPaymentMethod || this.paymentMethods?.[0]?.method || 'bank_transfer',
             notes: notes,
             // Sumber link CS (?ref=) — dikosongkan bila akses langsung
-            ref_code: this.refCode || null,
-            // Rekening terpilih di step terakhir (divalidasi server-side)
-            bank_account_id:
-                this.selectedPaymentMethod === 'bank_transfer' && this.selectedBank
-                    ? this.selectedBank.id
-                    : null
+            ref_code: this.refCode || null
         };
 
         try {
@@ -1033,6 +1017,7 @@ class DjuniorsRegistration {
         const regNumber = data.registration_number || data.registration?.registration_number || '-';
         const finalAmount = data.registration?.final_amount || 0;
         const paymentMethod = data.registration?.payment_method || this.selectedPaymentMethod;
+        const payment = data.payment || null;
 
         const modalRegNumberEl = document.getElementById('modal-reg-number');
         const modalTotalAmountEl = document.getElementById('modal-total-amount');
@@ -1042,11 +1027,25 @@ class DjuniorsRegistration {
 
         if (modalRegNumberEl) modalRegNumberEl.textContent = regNumber;
         if (modalTotalAmountEl) modalTotalAmountEl.textContent = `Rp ${finalAmount.toLocaleString('id-ID')}`;
-        
+
         let methodText = 'Transfer Bank';
         if (paymentMethod === 'qris') methodText = 'QRIS';
         if (paymentMethod === 'ewallet') methodText = 'E-Wallet';
-        if (modalPaymentMethodEl) modalPaymentMethodEl.textContent = methodText;
+        if (modalPaymentMethodEl) modalPaymentMethodEl.textContent = payment?.method_label || methodText;
+
+        // Bila metode pilihan pendaftar ternyata sudah tidak tersedia dan server
+        // memakai metode lain, beri tahu secara transparan.
+        if (data.payment_method_adjusted) {
+            const note = document.getElementById('modal-payment-adjusted-note');
+            if (note) {
+                note.textContent = `Metode pembayaran yang Anda pilih sudah tidak tersedia. Pendaftaran Anda memakai ${payment?.method_label || methodText}.`;
+                note.style.display = 'block';
+            }
+        }
+
+        // Info pembayaran lengkap (nomor rekening/e-wallet/QRIS + nominal) —
+        // hanya untuk metode yang dipilih pendaftar.
+        this.renderModalPaymentInfo(payment, finalAmount, regNumber);
 
         // Set tracking URL
         if (trackBtn) {
@@ -1065,6 +1064,65 @@ class DjuniorsRegistration {
         }
 
         modal.classList.remove('hidden');
+    }
+
+    /**
+     * Render instruksi pembayaran lengkap di popup "Pendaftaran Berhasil".
+     * Detail disesuaikan dengan metode yang dipilih (bank / e-wallet / QRIS).
+     */
+    renderModalPaymentInfo(payment, fallbackAmount, regNumber) {
+        const box = document.getElementById('modal-payment-info');
+        const accountEl = document.getElementById('modal-payment-account');
+        const instrEl = document.getElementById('modal-payment-instructions');
+        const copyBtn = document.getElementById('modal-payment-copy');
+        if (!box || !accountEl) return;
+
+        const amount = Number(payment?.amount ?? fallbackAmount) || 0;
+        const nominal = `Rp ${amount.toLocaleString('id-ID')}`;
+        const account = payment?.account || null;
+
+        if (!account) {
+            // Tidak ada rekening untuk metode ini — beri arahan manual.
+            accountEl.innerHTML = '';
+            if (instrEl) {
+                instrEl.textContent =
+                    payment?.instructions ||
+                    'Detail pembayaran belum tersedia. Silakan hubungi admin D’Juniors untuk instruksi pembayaran.';
+            }
+            if (copyBtn) copyBtn.style.display = 'none';
+            box.style.display = 'block';
+            return;
+        }
+
+        const label = payment?.method === 'qris'
+            ? 'QRIS Resmi D’Juniors'
+            : payment?.method === 'ewallet'
+                ? 'Tujuan E-Wallet'
+                : 'Rekening Tujuan Transfer';
+
+        accountEl.innerHTML = `
+            <div style="font-size: 0.78rem; font-weight: 700; color: #64748b;">${label}</div>
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: 2px;">
+                <span style="font-weight: 800; color: #1E293B; font-size: 1rem;">${this.escapeHtml(account.name)}</span>
+                <span style="font-family: monospace; font-size: 1.25rem; font-weight: 800; color: #FF6B35; letter-spacing: 1.5px;">${this.escapeHtml(account.number)}</span>
+            </div>
+            <div style="font-size: 0.82rem; color: #64748b;">a.n. ${this.escapeHtml(account.holder)}</div>
+            <div style="margin-top: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #1E293B;">
+                Nominal: <span style="color: #FF6B35;">${nominal}</span>
+            </div>
+            <div style="margin-top: 0.4rem; font-size: 0.78rem; color: #64748b;">
+                Kode referensi: <strong style="font-family: monospace;">${this.escapeHtml(regNumber || '')}</strong>
+            </div>
+        `;
+
+        if (instrEl) {
+            instrEl.textContent = payment?.instructions || `Transfer ${nominal} lalu unggah bukti pembayaran Anda.`;
+        }
+        if (copyBtn) {
+            copyBtn.style.display = '';
+            copyBtn.setAttribute('data-copy', String(account.number || ''));
+        }
+        box.style.display = 'block';
     }
 }
 
