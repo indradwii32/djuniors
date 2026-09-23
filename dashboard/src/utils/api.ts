@@ -716,6 +716,75 @@ export const csApi = {
   },
 };
 
+// Setelan Fonnte + pesan WhatsApp per-CS
+export interface CsWaSettings {
+  fonnte_token_masked: string;
+  fonnte_token_set: boolean;
+  tpl_registration: string;
+  tpl_payment: string;
+  auto_registration: boolean;
+  auto_payment: boolean;
+  is_default: boolean;
+  updated_at: string | null;
+}
+export interface CsWaSettingsResponse {
+  success: boolean;
+  account: { id: string; name: string; ref_code: string | null };
+  settings: CsWaSettings;
+  placeholders: string[];
+  global_token_set: boolean;
+}
+export interface CsWaResult {
+  status: 'sent' | 'failed' | 'skipped' | 'error';
+  detail?: string;
+}
+
+export const csWaApi = {
+  getSettings: async (ref?: string): Promise<CsWaSettingsResponse> => {
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return apiRequest<CsWaSettingsResponse>(`/cs/wa-settings${qs}`);
+  },
+  saveSettings: async (
+    payload: {
+      ref?: string;
+      fonnte_token?: string;
+      clear_token?: boolean;
+      tpl_registration?: string;
+      tpl_payment?: string;
+      auto_registration?: boolean;
+      auto_payment?: boolean;
+    }
+  ): Promise<{ success: boolean; settings: CsWaSettings }> => {
+    const { ref, ...body } = payload;
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return apiRequest(`/cs/wa-settings${qs}`, { method: 'PUT', body: JSON.stringify(body) });
+  },
+  preview: async (
+    registrationId: string,
+    event: 'registration' | 'payment'
+  ): Promise<{ success: boolean; phone: string; message: string; ref_code: string | null }> => {
+    return apiRequest(
+      `/cs/wa-preview?registration_id=${encodeURIComponent(registrationId)}&event=${event}`
+    );
+  },
+  send: async (payload: {
+    registration_id: string;
+    message: string;
+    phone?: string;
+  }): Promise<{ success: boolean; status: 'sent' | 'failed'; message: string }> => {
+    return apiRequest('/cs/wa-send', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  sendTest: async (payload: {
+    phone: string;
+    message?: string;
+    ref?: string;
+  }): Promise<{ success: boolean; status: 'sent' | 'failed'; source?: string; message: string }> => {
+    const { ref, ...body } = payload;
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return apiRequest(`/cs/wa-test${qs}`, { method: 'POST', body: JSON.stringify(body) });
+  },
+};
+
 // Payments Endpoints
 export const paymentsApi = {
   getAll: async (): Promise<PaymentItem[]> => {

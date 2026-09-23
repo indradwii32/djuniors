@@ -24,6 +24,7 @@ import {
   CsOverview,
   buildRefLink,
 } from '../utils/api';
+import WaSettingsCard from '../components/WaSettingsCard';
 
 const formatIDR = (val?: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
@@ -160,7 +161,8 @@ export const CSLinks: React.FC = () => {
 
       {overview ? (
         <>
-          {/* Kartu link */}
+          {/* Kartu link — hanya bila ada ref (admin tanpa ?ref melihat agregat) */}
+          {overview.ref_code && (
           <div
             style={{
               background: 'linear-gradient(135deg, #6D28D9 0%, #4C1D95 100%)',
@@ -227,6 +229,7 @@ export const CSLinks: React.FC = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Statistik */}
           <div className="stats-grid" style={{ display: 'grid', gap: '1rem' }}>
@@ -269,8 +272,16 @@ export const CSLinks: React.FC = () => {
           </div>
 
           <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: 0, textAlign: 'center' }}>
-            Statistik dihitung dari pendaftaran dengan kode ref <strong>{overview.ref_code}</strong>.
-            {isAdmin && ' Untuk melihat semua CS sekaligus, buka Pengaturan Sistem → Akun Tim.'}
+            {overview.ref_code ? (
+              <>
+                Statistik dihitung dari pendaftaran dengan kode ref <strong>{overview.ref_code}</strong>.
+              </>
+            ) : (
+              <>
+                Statistik agregat <strong>semua CS</strong> — pilih CS di dropdown bawah untuk mengelola setelannya.
+              </>
+            )}
+            {isAdmin && ' Untuk mengelola akun & link CS, buka Pengaturan Sistem → Akun Tim.'}
           </p>
         </>
       ) : (
@@ -280,6 +291,9 @@ export const CSLinks: React.FC = () => {
           </div>
         )
       )}
+
+      {/* Setelan Fonnte + pesan WhatsApp per-CS */}
+      <WaSettingsCard isAdmin={isAdmin} />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { Bindings, Variables, Registration, RegistrationChild } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2 } from '../utils/payment';
+import { sendCsWaAuto } from '../utils/cs-wa';
 
 const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Public tracking reads are cached for 60s — long enough to absorb repeated
@@ -255,11 +256,35 @@ registrations.post('/', async (c) => {
     // New registration → invalidate cached tracking reads + admin stats.
     await bumpCacheVersion(c.env, 'registrations');
 
+    // Notifikasi WhatsApp otomatis ke pendaftar (setelan milik CS pemilik
+    // link). Selalu aman: gagal kirim tidak memblokir pendaftaran.
+    const waNotification = await sendCsWaAuto(
+        c.env,
+        {
+            registration_number: registrationNumber,
+            parent_name: parent_name.trim(),
+            parent_phone: parent_phone.trim(),
+            parent_city: parent_city ? parent_city.trim() : null,
+            class_id,
+            class_name: classInfo.name,
+            schedule_slot: scheduleSlotStr,
+            children: parsedChildren,
+            total_amount: totalAmount,
+            final_amount: finalAmount,
+            payment_status: 'unpaid',
+            ref_code: storedRefCode,
+            created_at: new Date().toISOString(),
+        },
+        'registration',
+        { baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin }
+    );
+
     return c.json({
         success: true,
         id,
         registration_number: registrationNumber,
         tracking_id: trackingId,
+        wa_notification: waNotification,
         registration: {
             id,
             registration_number: registrationNumber,

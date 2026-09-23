@@ -70,7 +70,9 @@ export async function sendWAFonnte(
                 message: message,
                 typing: options?.typing ?? true,
                 delay: options?.delay ?? 0
-            })
+            }),
+            // Jangan pernah menahan response request lain bila Fonnte lambat/matikan
+            signal: AbortSignal.timeout(10_000)
         });
 
         const data = await response.json() as any;
@@ -148,7 +150,8 @@ export async function checkFonnteStatus(config: FonnteConfig): Promise<boolean> 
         const response = await fetch(`${baseUrl}/status`, {
             headers: {
                 'Authorization': config.token
-            }
+            },
+            signal: AbortSignal.timeout(8_000)
         });
 
         const data = await response.json() as any;

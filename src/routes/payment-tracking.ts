@@ -11,6 +11,7 @@ import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2 } from '../utils/payment';
+import { sendCsWaAuto } from '../utils/cs-wa';
 
 const paymentTracking = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -358,11 +359,25 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
     // Confirmation changes what the public tracking page shows — invalidate.
     await bumpCacheVersion(c.env, 'registrations');
 
+    // Notifikasi WhatsApp "pembayaran dikonfirmasi" memakai setelan milik CS
+    // pemilik link pendaftaran. Tidak pernah melempar — aman di sini.
+    let waNotification = null;
+    if (status === 'confirmed' && registration?.id) {
+        const full = await c.env.DB.prepare('SELECT * FROM registrations WHERE id = ?')
+            .bind(registration.id).first();
+        if (full) {
+            waNotification = await sendCsWaAuto(c.env, full, 'payment', {
+                baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin,
+            });
+        }
+    }
+
     return c.json({
         success: true,
         tracking_id: trackingId,
         status,
         confirmed_by: confirmedBy,
+        wa_notification: waNotification,
         message: status === 'confirmed'
             ? 'Pembayaran berhasil dikonfirmasi'
             : 'Pembayaran ditolak'

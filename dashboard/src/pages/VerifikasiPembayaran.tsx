@@ -26,11 +26,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  MessageCircle,
+  Send as SendIcon,
 } from 'lucide-react';
 import {
   paymentTrackingApi,
   PaymentTrackingPagination,
   API_BASE_URL,
+  csWaApi,
 } from '../utils/api';
 
 type TabKey = 'pending' | 'confirmed' | 'rejected' | 'all';
@@ -143,6 +146,62 @@ export const VerifikasiPembayaran: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  // ---- Kirim WhatsApp manual (modal) ----
+  const [waModal, setWaModal] = useState<{ row: TrackingRow; phone: string; message: string } | null>(null);
+  const [waBusy, setWaBusy] = useState(false);
+
+  const openWaModal = async (row: TrackingRow) => {
+    setWaModal({ row, phone: row.parent_phone || '', message: '' });
+    if (!row.registration_id) {
+      setWaModal({
+        row,
+        phone: row.parent_phone || '',
+        message: '',
+      });
+      showToast('Baris ini tidak terhubung ke data pendaftaran', 'error');
+      return;
+    }
+    try {
+      setWaBusy(true);
+      const res = await csWaApi.preview(row.registration_id, row.status === 'pending' ? 'registration' : 'payment');
+      setWaModal((prev) =>
+        prev && prev.row.id === row.id ? { ...prev, phone: res.phone || prev.phone, message: res.message } : prev
+      );
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal memuat pratinjau pesan', 'error');
+      setWaModal(null);
+    } finally {
+      setWaBusy(false);
+    }
+  };
+
+  const handleSendWa = async () => {
+    if (!waModal) return;
+    const regId = waModal.row.registration_id;
+    if (!regId) {
+      showToast('Pendaftaran tidak ditemukan', 'error');
+      return;
+    }
+    if (!waModal.message.trim()) {
+      showToast('Pesan masih kosong', 'error');
+      return;
+    }
+    try {
+      setWaBusy(true);
+      const res = await csWaApi.send({
+        registration_id: regId,
+        message: waModal.message.trim(),
+        phone: waModal.phone.trim() || undefined,
+      });
+      showToast(res.success ? 'Pesan WhatsApp terkirim' : res.message || 'Gagal mengirim', res.success ? 'success' : 'error');
+      if (res.success) setWaModal(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal mengirim pesan', 'error');
+    } finally {
+      setWaBusy(false);
+    }
+  };
+
   const loadData = useCallback(
     async (isRefresh = false) => {
       try {
@@ -184,7 +243,16 @@ export const VerifikasiPembayaran: React.FC = () => {
       setBusyId(row.id);
       const notes = (notesInput[row.id] || '').trim();
       const res = await paymentTrackingApi.confirm(row.id, decision, notes || undefined);
-      showToast(res.message || (decision === 'confirmed' ? 'Pembayaran diterima' : 'Pembayaran ditolak'));
+      const wa = (res as { wa_notification?: { status?: string } | null }).wa_notification;
+      const waNote =
+        decision === 'confirmed' && wa
+          ? wa.status === 'sent'
+            ? ' · WA terkirim'
+            : wa.status === 'failed'
+              ? ' · WA gagal terkirim'
+              : ''
+          : '';
+      showToast((res.message || (decision === 'confirmed' ? 'Pembayaran diterima' : 'Pembayaran ditolak')) + waNote);
       setNotesInput((prev) => ({ ...prev, [row.id]: '' }));
       await loadData(true);
     } catch (err: unknown) {
@@ -514,6 +582,28 @@ export const VerifikasiPembayaran: React.FC = () => {
                         <Building2 size={11} /> {row.bank_name} · {row.bank_account_number}
                       </div>
                     )}
+                    {(row.registration_id || row.parent_phone) && (
+                      <button
+                        onClick={() => openWaModal(row)}
+                        disabled={waBusy}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          marginTop: '8px',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '8px',
+                          border: '1px solid #A7F3D0',
+                          backgroundColor: '#ECFDF5',
+                          color: '#047857',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: waBusy ? 'wait' : 'pointer',
+                        }}
+                      >
+                        <MessageCircle size={13} /> Kirim WA
+                      </button>
+                    )}
                   </div>
 
                   {/* Aksi (hanya tab menunggu / status pending) */}
@@ -639,6 +729,158 @@ export const VerifikasiPembayaran: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal: Kirim WhatsApp Manual */}
+      {waModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            zIndex: 260,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+          onClick={() => {
+            if (!waBusy) setWaModal(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '560px',
+              padding: '1.5rem',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+              <div>
+                <span
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    color: '#047857',
+                    padding: '3px 9px',
+                    borderRadius: '7px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <MessageCircle size={13} /> Kirim WhatsApp
+                </span>
+                <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.25rem', color: '#1E293B', margin: '8px 0 0 0' }}>
+                  {waModal.row.registration_number}
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '2px 0 0 0' }}>
+                  {waModal.row.parent_name || 'Pendaftar'}
+                  {waModal.row.ref_code ? ` · CS: ${waModal.row.ref_code}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => !waBusy && setWaModal(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginTop: '1.1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '5px' }}>
+                Tujuan (WhatsApp)
+              </label>
+              <input
+                value={waModal.phone}
+                onChange={(e) => setWaModal({ ...waModal, phone: e.target.value })}
+                placeholder="08xxxxxxxxxx"
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ marginTop: '0.9rem' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '5px' }}>
+                Pesan
+              </label>
+              <textarea
+                value={waModal.message}
+                onChange={(e) => setWaModal({ ...waModal, message: e.target.value })}
+                rows={10}
+                maxLength={3000}
+                placeholder={waBusy ? 'Memuat pratinjau pesan...' : 'Tulis pesan...'}
+                style={{
+                  width: '100%',
+                  padding: '0.7rem 0.85rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  fontSize: '0.9rem',
+                  lineHeight: 1.55,
+                  resize: 'vertical',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ fontSize: '0.73rem', color: '#94A3B8', marginTop: '4px' }}>
+                {waBusy
+                  ? 'Memuat pratinjau dari template CS...'
+                  : 'Pratinjau terisi dari template WhatsApp milik CS — bisa diedit sebelum dikirim. Token Fonnte CS (atau global) yang dipakai.'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.1rem' }}>
+              <button
+                disabled={waBusy}
+                onClick={() => setWaModal(null)}
+                style={{
+                  padding: '0.65rem 1.2rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  cursor: waBusy ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Batal
+              </button>
+              <button
+                disabled={waBusy || !waModal.message.trim()}
+                onClick={handleSendWa}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.65rem 1.4rem',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: waBusy || !waModal.message.trim() ? '#94A3B8' : '#10B981',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.875rem',
+                  cursor: waBusy || !waModal.message.trim() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <SendIcon size={15} /> {waBusy ? 'Mengirim...' : 'Kirim Pesan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && (
