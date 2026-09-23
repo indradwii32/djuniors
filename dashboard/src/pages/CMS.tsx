@@ -2988,7 +2988,7 @@ export const CMS: React.FC = () => {
                 {/* Meta SEO Preview */}
                 {activeTab === 'meta' && (
                   <div style={{ backgroundColor: '#FFFFFF', padding: '1rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#202124' }}>https://djuniors.id</div>
+                    <div style={{ fontSize: '0.75rem', color: '#202124' }}>https://djuniorslc.com</div>
                     <div style={{ fontSize: '1rem', color: '#1A0DAB', fontWeight: 600, margin: '2px 0', textDecoration: 'underline' }}>
                       {formData.meta?.meta_title}
                     </div>

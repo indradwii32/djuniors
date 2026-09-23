@@ -7,12 +7,12 @@
 ```
                           ┌─────────────────────────┐
                           │  Visitors (landing page)│
-                          │  djuniors.id (CF Pages) │
+                          │  djuniorslc.com (CF Pages) │
                           └───────────┬─────────────┘
                                       │ fetch /api/*
                           ┌───────────▼─────────────┐        ┌──────────────────────┐
-                          │  Admin (dashboard SPA)  │───────▶│ api.djuniors.id      │
-                          │  admin.djuniors.id      │        │ (Cloudflare Worker)  │
+                          │  Admin (dashboard SPA)  │───────▶│ api.djuniorslc.com      │
+                          │  admin.djuniorslc.com      │        │ (Cloudflare Worker)  │
                           └─────────────────────────┘        └──────────┬───────────┘
                                                                        │
                     ┌──────────────────────────────────────────────────┘

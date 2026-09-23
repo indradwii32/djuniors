@@ -276,6 +276,15 @@ export const instrumentR2 = (c: Context<{ Bindings: Bindings; Variables: any }>)
                 // "Illegal invocation" di workerd (mis. upload bukti ke R2).
                 return (...args: any[]) => value.apply(target, args);
             }
+            if (prop === 'put' && typeof value === 'function') {
+                return (...args: any[]) => value.apply(target, args);
+            }
+            if (prop === 'delete' && typeof value === 'function') {
+                return (...args: any[]) => value.apply(target, args);
+            }
+            if (prop === 'list' && typeof value === 'function') {
+                return (...args: any[]) => value.apply(target, args);
+            }
             return value;
         },
     });

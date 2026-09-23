@@ -51,7 +51,7 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
     badge: '👋 Sambutan',
     description: 'Pesan selamat datang otomatis untuk siswa/wali murid yang baru mendaftar di Djuniors.',
     placeholders: ['{nama}', '{nama_orang_tua}', '{nomor_pendaftaran}', '{jadwal}', '{kota}'],
-    content: `🎮 *Selamat Datang di Djuniors!* 🎉\n\nHalo {nama}!\n\nTerima kasih sudah mendaftar di Djuniors ({kota}).\n🔖 No. Pendaftaran: *{nomor_pendaftaran}*\n📅 Jadwal: *{jadwal}*\n\nSiap belajar matematika jadi seru? 🚀\n\n📞 Hubungi kami jika ada pertanyaan!\n🌐 www.djuniors.id`,
+    content: `🎮 *Selamat Datang di Djuniors!* 🎉\n\nHalo {nama}!\n\nTerima kasih sudah mendaftar di Djuniors ({kota}).\n🔖 No. Pendaftaran: *{nomor_pendaftaran}*\n📅 Jadwal: *{jadwal}*\n\nSiap belajar matematika jadi seru? 🚀\n\n📞 Hubungi kami jika ada pertanyaan!\n🌐 www.djuniorslc.com`,
   },
   enrollment_confirmed: {
     id: 'enrollment_confirmed',
@@ -145,7 +145,7 @@ export const ALL_PLACEHOLDERS_CATEGORIES = [
   {
     category: 'Informasi Rekening Bank',
     items: [
-      { tag: '{nama_bank}', desc: 'Nama bank tujuan transfer (BCA)' },
+      { tag: '{nama_bank}', desc: 'Nama bank tujuan transfer (BCA Syariah)' },
       { tag: '{nomor_rekening}', desc: 'Nomor rekening bank tujuan' },
       { tag: '{nama_pemilik_rekening}', desc: 'Atas nama rekening bank' },
       { tag: '{bank}', desc: 'Alias nama bank' },
@@ -192,33 +192,33 @@ const PREVIEW_SAMPLE_DATA: Record<string, string> = {
   order_id: 'DJN-20260825-XXXX',
 
   // Kelas & Jadwal
-  kelas: 'Matematika Kelas 1 SD',
-  nama_kelas: 'Matematika Kelas 1 SD',
-  className: 'Matematika Kelas 1 SD',
-  class_name: 'Matematika Kelas 1 SD',
-  jadwal: 'Senin & Rabu 16:00 WIB',
-  schedule: 'Senin & Rabu 16:00 WIB',
-  schedule_slot: 'Senin & Rabu 16:00 WIB',
-  scheduleSlot: 'Senin & Rabu 16:00 WIB',
+  kelas: 'Kelas Reguler (SD Kelas 4-6)',
+  nama_kelas: 'Kelas Reguler (SD Kelas 4-6)',
+  className: 'Kelas Reguler (SD Kelas 4-6)',
+  class_name: 'Kelas Reguler (SD Kelas 4-6)',
+  jadwal: 'Senin & Rabu 16.00 - 17.00 WIB',
+  schedule: 'Senin & Rabu 16.00 - 17.00 WIB',
+  schedule_slot: 'Senin & Rabu 16.00 - 17.00 WIB',
+  scheduleSlot: 'Senin & Rabu 16.00 - 17.00 WIB',
 
   // Kota
-  kota: 'Jakarta',
-  city: 'Jakarta',
-  parent_city: 'Jakarta',
-  parentCity: 'Jakarta',
+  kota: 'Kediri',
+  city: 'Kediri',
+  parent_city: 'Kediri',
+  parentCity: 'Kediri',
 
   // Nominal & Biaya
-  nominal: '199.000',
-  amount: '199.000',
-  total_biaya: '199.000',
-  total_amount: '199.000',
-  totalAmount: '199.000',
-  diskon_nominal: '19.900',
+  nominal: '97.000',
+  amount: '97.000',
+  total_biaya: '97.000',
+  total_amount: '97.000',
+  totalAmount: '97.000',
+  diskon_nominal: '9.700',
   discount_amount: '19.900',
   discountAmount: '19.900',
-  tagihan_akhir: '179.100',
-  final_amount: '179.100',
-  finalAmount: '179.100',
+  tagihan_akhir: '87.300',
+  final_amount: '87.300',
+  finalAmount: '87.300',
 
   // Promo
   kode_promo: 'DJUNIOR10',
@@ -234,10 +234,10 @@ const PREVIEW_SAMPLE_DATA: Record<string, string> = {
   metode: 'Transfer Bank',
 
   // Link Tracking & Pembayaran
-  link_pembayaran: 'https://djuniors.id/lacak.html?number=DJN-20260825-XXXX',
-  link_verifikasi: 'https://djuniors.id/lacak.html?number=DJN-20260825-XXXX',
-  payment_url: 'https://djuniors.id/lacak.html?number=DJN-20260825-XXXX',
-  paymentUrl: 'https://djuniors.id/lacak.html?number=DJN-20260825-XXXX',
+  link_pembayaran: 'https://djuniorslc.com/lacak.html?number=DJN-20260825-XXXX',
+  link_verifikasi: 'https://djuniorslc.com/lacak.html?number=DJN-20260825-XXXX',
+  payment_url: 'https://djuniorslc.com/lacak.html?number=DJN-20260825-XXXX',
+  paymentUrl: 'https://djuniorslc.com/lacak.html?number=DJN-20260825-XXXX',
 
   // Tanggal & Waktu
   tanggal_pendaftaran: '25 Agustus 2026',
@@ -577,7 +577,7 @@ export const Notifications: React.FC = () => {
       setManualRecipientName(student.full_name);
       // In Djuniors, phone might be parent phone or placeholder
       if (!manualPhone) {
-        setManualPhone('081234567890');
+        setManualPhone('087714977001');
       }
       if (manualMessage.includes('{nama}')) {
         setManualMessage(manualMessage.replace('{nama}', student.full_name));
@@ -1113,7 +1113,7 @@ export const Notifications: React.FC = () => {
                 <div style={{ position: 'relative' }}>
                   <input
                     type="tel"
-                    placeholder="Contoh: 081234567890 atau 6281234567890"
+                    placeholder="Contoh: 087714977001 atau 6287714977001"
                     value={manualPhone}
                     onChange={(e) => setManualPhone(e.target.value)}
                     required

@@ -3,7 +3,7 @@
 // ============================================
 // API base URL strategy (Task A):
 //   - Production dev: read from `import.meta.env.VITE_API_BASE` injected at
-//     build time (e.g. `VITE_API_BASE=https://api.djuniors.id`).
+//     build time (e.g. `VITE_API_BASE=https://api.djuniorslc.com`).
 //   - Production with same-origin (CF Pages + custom domain configured for
 //     cross-origin routing): `VITE_API_BASE=""` makes requests relative.
 //   - Local dev: `/api` — Vite dev server proxies to wrangler on :8787.

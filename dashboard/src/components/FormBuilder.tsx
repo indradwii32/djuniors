@@ -245,7 +245,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
           label: 'Nomor WhatsApp Orang Tua / Wali',
           type: 'tel',
           required: true,
-          placeholder: 'Contoh: 081234567890',
+          placeholder: 'Contoh: 087714977001',
         },
         {
           id: `field_${Date.now()}_5`,
@@ -1581,7 +1581,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
                   {f.type === 'tel' && (
                     <input
                       type="tel"
-                      placeholder={f.placeholder || '081234567890'}
+                      placeholder={f.placeholder || '087714977001'}
                       value={previewValues[f.name] || ''}
                       onChange={(e) =>
                         setPreviewValues({ ...previewValues, [f.name]: e.target.value })

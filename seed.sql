@@ -101,7 +101,7 @@ VALUES
         'reg-001',
         'REG-001',
         'Ibu Rina',
-        '081234567890',
+        '087714977001',
         'rina@example.com',
         'Kediri',
         'cls-reg-01',
@@ -167,7 +167,7 @@ VALUES
         'track-001',
         'reg-001',
         'REG-001',
-        '081234567890',
+        '087714977001',
         97000,
         'bank_transfer',
         '/uploads/proof-reg-001.jpg',
@@ -523,7 +523,7 @@ Terima kasih sudah mendaftar di Djuniors ({kota}).
 Siap belajar matematika jadi seru? 🚀
 
 📞 Hubungi kami jika ada pertanyaan!
-🌐 www.djuniors.id',
+🌐 www.djuniorslc.com',
         2
     ),
     (

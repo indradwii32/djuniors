@@ -1,0 +1,2 @@
+# Cloudflare Pages Redirects & Proxies
+/api/* https://api.djuniorslc.com/api/:splat 200

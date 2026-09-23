@@ -166,7 +166,7 @@ export async function checkFonnteStatus(config: FonnteConfig): Promise<boolean> 
  */
 export const FonnteTemplates = {
     welcome: (name: string) =>
-        `🎮 *Selamat Datang di Djuniors!* 🎉\n\nHalo ${name}!\n\nTerima kasih sudah bergabung dengan Djuniors. Siap belajar matematika jadi seru? 🚀\n\n📞 Hubungi kami jika ada pertanyaan!\n🌐 www.djuniors.id`,
+        `🎮 *Selamat Datang di Djuniors!* 🎉\n\nHalo ${name}!\n\nTerima kasih sudah bergabung dengan Djuniors. Siap belajar matematika jadi seru? 🚀\n\n📞 Hubungi kami jika ada pertanyaan!\n🌐 www.djuniorslc.com`,
 
     enrollmentConfirmed: (name: string, className: string) =>
         `✅ *Pendaftaran Berhasil!*\n\nHalo ${name}!\n\nKamu sudah terdaftar di kelas:\n📚 *${className}*\n\n📅 Jadwal dan materi akan dikirim segera.\n\nSemangat belajar! 💪`,

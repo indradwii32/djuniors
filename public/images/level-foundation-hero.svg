@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220">
+  <defs>
+    <linearGradient id="bgGrad_foundation" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E0F2FE"/>
+      <stop offset="100%" stop-color="#BAE6FD"/>
+    </linearGradient>
+    <filter id="shadow_foundation" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  <rect width="400" height="220" rx="16" fill="url(#bgGrad_foundation)"/>
+  
+  <!-- Decorative circles -->
+  <circle cx="200" cy="95" r="54" fill="#FFFFFF" opacity="0.9" filter="url(#shadow_foundation)"/>
+  <circle cx="45" cy="40" r="30" fill="#FFFFFF" opacity="0.4"/>
+  <circle cx="360" cy="180" r="35" fill="#FFFFFF" opacity="0.4"/>
+  <circle cx="355" cy="40" r="22" fill="#FFFFFF" opacity="0.35"/>
+
+  <!-- Main Mascot / Level Icon -->
+  <text x="200" y="105" font-size="52" text-anchor="middle" dominant-baseline="middle">🐣</text>
+  
+  <!-- Floating Motif Pills -->
+  <g transform="translate(25, 40)">
+    <rect width="46" height="26" rx="8" fill="#FFFFFF" opacity="0.9" filter="url(#shadow_foundation)"/>
+    <text x="23" y="17" font-size="12" font-weight="800" fill="#0284C7" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" text-anchor="middle">1+2</text>
+  </g>
+  <g transform="translate(328, 30)">
+    <rect width="46" height="26" rx="8" fill="#FFFFFF" opacity="0.9" filter="url(#shadow_foundation)"/>
+    <text x="23" y="17" font-size="12" font-weight="800" fill="#0284C7" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" text-anchor="middle">5-3</text>
+  </g>
+  <text x="60" y="165" font-size="22" text-anchor="middle">🔢</text>
+  <text x="340" y="160" font-size="22" text-anchor="middle">⭐</text>
+
+  <!-- Level Badge Pill Bottom -->
+  <g transform="translate(60, 168)">
+    <rect width="280" height="34" rx="17" fill="#FFFFFF" opacity="0.95" filter="url(#shadow_foundation)"/>
+    <text x="140" y="18" font-size="12" font-weight="800" fill="#0284C7" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" text-anchor="middle" dominant-baseline="middle" letter-spacing="0.5">FOUNDATION • TK - SD Kelas 2-3</text>
+  </g>
+</svg>

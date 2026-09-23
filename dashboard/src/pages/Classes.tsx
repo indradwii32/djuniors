@@ -55,7 +55,7 @@ export const Classes: React.FC = () => {
   const [formImageUrl, setFormImageUrl] = useState<string>('');
   const [formDescription, setFormDescription] = useState<string>('');
   const [formLevelId, setFormLevelId] = useState<string>('');
-  const [formPrice, setFormPrice] = useState<number>(199000);
+  const [formPrice, setFormPrice] = useState<number>(97000);
   const [formMaxStudents, setFormMaxStudents] = useState<number>(8);
   const [formScheduleSlots, setFormScheduleSlots] = useState<ScheduleSlot[]>([
     { day: 'Senin', start_time: '15:00', end_time: '16:00' },
@@ -146,7 +146,7 @@ export const Classes: React.FC = () => {
     setFormImageUrl('');
     setFormDescription('');
     setFormLevelId(levels.length > 0 ? levels[0].id : '');
-    setFormPrice(199000);
+    setFormPrice(97000);
     setFormMaxStudents(8);
     setFormScheduleSlots([{ day: 'Senin', start_time: '15:00', end_time: '16:00' }]);
     setFormIsActive(true);
@@ -1002,7 +1002,7 @@ export const Classes: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Kelas Matematika TK"
+                    placeholder="Contoh: Kelas Reguler (SD Kelas 4-6)"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}

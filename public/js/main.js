@@ -4,6 +4,20 @@
 
 const API_BASE = window.API_BASE || (window.location.origin && window.location.origin.includes(':8787') ? '' : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8787' : 'https://api.djuniorslc.com'));
 
+/**
+ * Resolve media URL — ensures relative /api/ paths point to API_BASE
+ */
+function resolveMediaUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+        return url;
+    }
+    if (url.startsWith('/api/')) {
+        return `${API_BASE}${url}`;
+    }
+    return url;
+}
+
 // ============================================
 // Fallback Default Content
 // ============================================
@@ -126,9 +140,55 @@ const DEFAULT_LOGO_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/200
 
 const DEFAULT_FAVICON = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🧮</text></svg>`;
 
-const DEFAULT_HERO_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="600" height="450"><defs><linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23FFF8E7"/><stop offset="50%" stop-color="%23E8F4FD"/><stop offset="100%" stop-color="%23FFF0F5"/></linearGradient><linearGradient id="bubbleGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%234A90D9"/><stop offset="100%" stop-color="%23357abd"/></linearGradient></defs><rect width="600" height="450" rx="24" fill="url(%23bgGrad)"/><circle cx="300" cy="225" r="150" fill="%23FFFFFF" opacity="0.85"/><circle cx="120" cy="90" r="40" fill="%23FFD93D" opacity="0.3"/><circle cx="500" cy="360" r="55" fill="%23FF9CEE" opacity="0.3"/><circle cx="490" cy="110" r="45" fill="%236BCB77" opacity="0.25"/><text x="300" y="225" font-size="120" text-anchor="middle" dominant-baseline="middle">👩‍🏫</text><g transform="translate(160, 100)"><rect width="65" height="42" rx="10" fill="url(%23bubbleGrad)"/><text x="32" y="27" font-size="20" font-weight="bold" fill="white" text-anchor="middle">1+2</text></g><g transform="translate(380, 110)"><rect width="65" height="42" rx="10" fill="%23FF6B35"/><text x="32" y="27" font-size="20" font-weight="bold" fill="white" text-anchor="middle">5×3</text></g><g transform="translate(130, 310)"><rect width="70" height="42" rx="10" fill="%236BCB77"/><text x="35" y="27" font-size="20" font-weight="bold" fill="white" text-anchor="middle">10÷2</text></g><g transform="translate(410, 300)"><rect width="65" height="42" rx="10" fill="%23FFD93D"/><text x="32" y="27" font-size="20" font-weight="bold" fill="%232D3436" text-anchor="middle">💯</text></g><text x="500" y="90" font-size="34">✨</text><text x="90" y="230" font-size="30">⭐</text><text x="490" y="250" font-size="32">💫</text></svg>`;
+const DEFAULT_HERO_IMAGE = 'images/hero-mascot.webp';
 
-const DEFAULT_CLASS_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220"><defs><linearGradient id="cardGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23EBF4FF"/><stop offset="100%" stop-color="%23FFF5EA"/></linearGradient></defs><rect width="400" height="220" rx="14" fill="url(%23cardGrad)"/><circle cx="200" cy="100" r="65" fill="%23FFFFFF" opacity="0.9"/><text x="200" y="108" font-size="60" text-anchor="middle" dominant-baseline="middle">🧮</text><g transform="translate(30, 25)"><circle cx="15" cy="15" r="15" fill="%23FFD93D"/><text x="15" y="21" font-size="15" text-anchor="middle" font-weight="bold" fill="%232D3436">✨</text></g><g transform="translate(340, 25)"><circle cx="15" cy="15" r="15" fill="%236BCB77"/><text x="15" y="21" font-size="15" text-anchor="middle" font-weight="bold" fill="white">★</text></g><rect x="50" y="170" width="300" height="30" rx="15" fill="%23FFFFFF" opacity="0.92"/><text x="200" y="190" font-size="13" font-weight="bold" fill="%234A90D9" text-anchor="middle" font-family="sans-serif">🎮 Kelas Live Interaktif via Meet</text></svg>`;
+const DEFAULT_CLASS_IMAGE = 'images/level-foundation-hero.svg';
+
+/**
+ * Return Level-specific fallback Hero SVG
+ */
+function getClassFallbackSvg(cls) {
+    if (!cls) return 'images/level-foundation-hero.svg';
+    const nameLower = (cls.name || '').toLowerCase();
+    const levelId = cls.level_id || '';
+    if (nameLower.includes('private')) {
+        return 'images/level-private-hero.svg';
+    }
+    if (levelId === 'level-development' || nameLower.includes('development') || nameLower.includes('sd kelas 4')) {
+        return 'images/level-development-hero.svg';
+    }
+    if (levelId === 'level-progress' || nameLower.includes('progress') || nameLower.includes('smp')) {
+        return 'images/level-progress-hero.svg';
+    }
+    return 'images/level-foundation-hero.svg';
+}
+
+/**
+ * Return matching Hero image for a class:
+ * 1. cls.image_url (configured in DB)
+ * 2. CMS uploaded class_image matching this class
+ * 3. Fallback to Level Hero SVG
+ */
+function getClassHeroImage(cls, classImages = []) {
+    if (cls.image_url) {
+        return resolveMediaUrl(cls.image_url);
+    }
+    if (Array.isArray(classImages) && classImages.length > 0) {
+        const matched = classImages.find(img => {
+            if (!img) return false;
+            const meta = typeof img.metadata === 'string' ? parseJsonField(img.metadata, {}) : (img.metadata || {});
+            return (
+                meta.class_id === cls.id ||
+                meta.class_id === String(cls.id) ||
+                (img.name && img.name.toLowerCase().includes((cls.name || '').toLowerCase()))
+            );
+        });
+        if (matched && matched.file_url) {
+            return resolveMediaUrl(matched.file_url);
+        }
+    }
+    return getClassFallbackSvg(cls);
+}
 
 // ============================================
 // Image Optimization helpers (Task F)
@@ -144,7 +204,7 @@ const DEFAULT_CLASS_IMAGE = `data:image/svg+xml,<svg xmlns="http://www.w3.org/20
 //
 // `format: 'auto'` lets CF pick AVIF → WebP → JPEG → PNG automatically —
 // best LCP win per byte. `quality: 'auto'` likewise.
-const IMAGE_CDN_BASE = ''; // e.g. 'https://djuniors.id/cdn-cgi/image' in production — filled by deploy
+const IMAGE_CDN_BASE = ''; // e.g. 'https://djuniorslc.com/cdn-cgi/image' in production — filled by deploy
 
 /**
  * Returns a URL — CF-resized if CDN base is configured, otherwise the original.
@@ -323,7 +383,7 @@ async function fetchMedia(type = '') {
 async function fetchLogo() {
     try {
         const data = await fetchMedia('logo');
-        return data?.file?.file_url || null;
+        return resolveMediaUrl(data?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching logo:', error);
         return null;
@@ -337,7 +397,7 @@ async function fetchLogo() {
 async function fetchFavicon() {
     try {
         const data = await fetchMedia('favicon');
-        return data?.file?.file_url || null;
+        return resolveMediaUrl(data?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching favicon:', error);
         return null;
@@ -351,9 +411,9 @@ async function fetchFavicon() {
 async function fetchHeroImage() {
     try {
         const data = await fetchMedia('hero_image');
-        if (data?.file?.file_url) return data.file.file_url;
+        if (data?.file?.file_url) return resolveMediaUrl(data.file.file_url);
         const fallbackHero = await fetchMedia('hero');
-        return fallbackHero?.file?.file_url || null;
+        return resolveMediaUrl(fallbackHero?.file?.file_url) || null;
     } catch (error) {
         console.warn('Error fetching hero image:', error);
         return null;
@@ -367,7 +427,11 @@ async function fetchHeroImage() {
 async function fetchClassImages() {
     try {
         const data = await fetchMedia('class_image');
-        return data?.files || (data?.file ? [data.file] : []);
+        const list = data?.files || (data?.file ? [data.file] : []);
+        return list.map(item => ({
+            ...item,
+            file_url: resolveMediaUrl(item.file_url)
+        }));
     } catch (error) {
         console.warn('Error fetching class images:', error);
         return [];
@@ -566,7 +630,7 @@ function renderFavicon(faviconUrl) {
  * Hero is the LCP image — load eagerly at native size.
  */
 function renderHeroImage(heroImageUrl) {
-    const activeHeroUrl = heroImageUrl || DEFAULT_HERO_IMAGE;
+    const activeHeroUrl = resolveMediaUrl(heroImageUrl) || DEFAULT_HERO_IMAGE;
     const heroImg = document.getElementById('hero-image');
     if (!heroImg) return;
 
@@ -587,6 +651,7 @@ function renderHeroImage(heroImageUrl) {
 
     heroImg.onerror = function() {
         this.onerror = null;
+        this.removeAttribute('srcset');
         this.src = DEFAULT_HERO_IMAGE;
     };
 }
@@ -928,12 +993,20 @@ function renderLevels(levels) {
         return;
     }
 
-    const icons = ['🐣', '🎒', '🚀', '🧮', '📐', '⭐'];
-    const colors = ['blue', 'green', 'orange', 'pink'];
+    const levelIcons = {
+        'level-foundation': '🐣',
+        'level-development': '🎒',
+        'level-progress': '🚀'
+    };
+    const levelColors = {
+        'level-foundation': 'blue',
+        'level-development': 'green',
+        'level-progress': 'orange'
+    };
 
     container.innerHTML = levels.map((level, index) => {
-        const icon = icons[index % icons.length];
-        const color = colors[index % colors.length];
+        const icon = levelIcons[level.id] || ['🐣', '🎒', '🚀'][index % 3] || '🧮';
+        const color = levelColors[level.id] || ['blue', 'green', 'orange'][index % 3] || 'blue';
         const ageRange = (level.min_age && level.max_age)
             ? `Usia ${level.min_age} - ${level.max_age} Tahun`
             : (level.grade_range || 'Semua Usia');
@@ -965,33 +1038,18 @@ function renderClasses(classes, classImages = []) {
 
     container.innerHTML = classes.map((cls, index) => {
         const isPopular = index === 1 || classes.length === 1;
-        const levelBadge = cls.level_name ? cls.level_name.toUpperCase() : 'SEMUA LEVEL';
+        const levelBadge = cls.level_name ? `LEVEL ${cls.level_name.toUpperCase()}` : 'SEMUA LEVEL';
         const priceFormatted = Number(cls.price) === 0
             ? 'Gratis'
             : `Rp ${Number(cls.price).toLocaleString('id-ID')}`;
         const slots = parseScheduleSlots(cls.schedule_slots);
 
-        // Find associated class image: 1) cls.image_url from DB, 2) CMS media, 3) default
-        let classImgUrl = DEFAULT_CLASS_IMAGE;
-        if (cls.image_url) {
-            classImgUrl = cls.image_url;
-        } else if (Array.isArray(classImages) && classImages.length > 0) {
-            const matched = classImages.find(img => {
-                if (!img) return false;
-                const meta = typeof img.metadata === 'string' ? parseJsonField(img.metadata, {}) : (img.metadata || {});
-                return (
-                    meta.class_id === cls.id ||
-                    meta.class_id === String(cls.id) ||
-                    (img.name && img.name.toLowerCase().includes(cls.name.toLowerCase()))
-                );
-            });
-            if (matched && matched.file_url) {
-                classImgUrl = matched.file_url;
-            } else if (classImages[0] && classImages[0].file_url) {
-                // Fallback to class image from history
-                classImgUrl = classImages[index % classImages.length].file_url || DEFAULT_CLASS_IMAGE;
-            }
-        }
+        // Find associated class hero image:
+        // 1) cls.image_url from DB
+        // 2) CMS media uploaded for this class
+        // 3) Fallback level-specific hero banner
+        const fallbackHero = getClassFallbackSvg(cls);
+        const classImgUrl = getClassHeroImage(cls, classImages);
 
         const slotsHtml = slots.length > 0
             ? slots.map(s => `
@@ -1012,7 +1070,7 @@ function renderClasses(classes, classImages = []) {
                         width: 400,
                         height: 220,
                         sizes: '(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 400px',
-                        fallback: DEFAULT_CLASS_IMAGE
+                        fallback: fallbackHero
                     })}>
                 </div>
                 <div class="class-level-tag">${levelBadge}</div>
@@ -1029,7 +1087,7 @@ function renderClasses(classes, classImages = []) {
                     <div class="schedule-title">📅 Pilihan Jadwal Belajar:</div>
                     ${slotsHtml}
                 </div>
-                <a href="daftar.html?class=${encodeURIComponent(cls.id)}" class="btn-class ${isPopular ? 'btn-popular' : ''}">
+                <a href="daftar.html?class=${encodeURIComponent(cls.id)}&level=${encodeURIComponent(cls.level_id || '')}" class="btn-class ${isPopular ? 'btn-popular' : ''}">
                     Pilih Kelas Ini →
                 </a>
             </div>
