@@ -113,6 +113,17 @@ export const CSLinks: React.FC = () => {
         setClasses(active);
         // Awalnya kelas pertama dipilih supaya link per-kelas langsung terlihat.
         setSelectedClassIds((prev) => (prev.length > 0 ? prev : active[0]?.id ? [active[0].id] : []));
+      } else if (clsRes.status === 'rejected') {
+        // Jangan diam-diam tampil "belum ada kelas" — beri tahu sebabnya, karena
+        // kegagalan memuat kelas membuat generator link tidak bisa dipakai.
+        setClasses([]);
+        const reason: unknown = clsRes.reason;
+        const detail = reason instanceof Error ? reason.message : '';
+        setErrorMsg(
+          detail
+            ? `Gagal memuat daftar kelas: ${detail}`
+            : 'Gagal memuat daftar kelas, sehingga link per kelas belum bisa dibuat.'
+        );
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Gagal memuat data link');

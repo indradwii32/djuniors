@@ -114,6 +114,14 @@ const CS_ALLOWED_PATTERNS: RegExp[] = [
     /^\/api\/cs(\/|$)/,            // overview link & tracking milik CS
     /^\/api\/health$/,
 ];
+
+// Data referensi yang boleh DIBACA CS (GET saja, tidak boleh mengubah apa pun).
+// Daftar kelas dipakai halaman "Link Kelas Saya" untuk membentuk link per kelas —
+// tanpa ini CS selalu menerima 403 dan generator link-nya kosong.
+const CS_READONLY_PATTERNS: RegExp[] = [
+    /^\/api\/classes(\/|$)/,
+    /^\/api\/levels(\/|$)/,
+];
 app.use('/api/*', async (c, next) => {
     const authHeader = c.req.header('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -121,7 +129,9 @@ app.use('/api/*', async (c, next) => {
             const payload = await verifyJWT(authHeader.split(' ')[1], await getJwtSecret(c.env));
             if (payload && payload.type === 'admin' && payload.role === 'cs') {
                 const path = new URL(c.req.url).pathname;
-                if (!CS_ALLOWED_PATTERNS.some((re) => re.test(path))) {
+                const isReadOnlyRef =
+                    c.req.method === 'GET' && CS_READONLY_PATTERNS.some((re) => re.test(path));
+                if (!isReadOnlyRef && !CS_ALLOWED_PATTERNS.some((re) => re.test(path))) {
                     return c.json({
                         error: 'Forbidden',
                         message: 'Akun CS hanya memiliki akses ke modul pendaftaran',
