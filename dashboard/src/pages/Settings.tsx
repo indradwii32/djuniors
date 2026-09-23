@@ -17,9 +17,12 @@ import {
   Save,
   Lock,
   Users,
+  ArrowUp,
+  ArrowDown,
+  Shuffle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { paymentsApi, notificationsApi, authApi, adminAccountsApi, BankAccount, AdminAccountItem } from '../utils/api';
+import { paymentsApi, notificationsApi, authApi, adminAccountsApi, rotatorApi, BankAccount, AdminAccountItem } from '../utils/api';
 
 const DEFAULT_BANKS: BankAccount[] = [
   {
@@ -89,6 +92,11 @@ export const Settings: React.FC = () => {
 
   // Akun Tim (admin & CS) State
   const [accounts, setAccounts] = useState<AdminAccountItem[]>([]);
+  // Rotator pendaftaran (delegasi otomatis pendaftaran tanpa ref → CS)
+  const [rotatorEnabled, setRotatorEnabled] = useState<boolean>(false);
+  const [rotatorRefs, setRotatorRefs] = useState<string[]>([]);
+  const [isSavingRotator, setIsSavingRotator] = useState<boolean>(false);
+  const isAdminRole = user?.role === 'admin' || user?.role === 'super_admin';
   const [isTeamModalOpen, setIsTeamModalOpen] = useState<boolean>(false);
   const [teamModalMode, setTeamModalMode] = useState<'create' | 'edit'>('create');
   const [teamEditId, setTeamEditId] = useState<string | null>(null);
@@ -154,6 +162,54 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     loadAccounts();
   }, [loadAccounts]);
+
+  // Muat konfigurasi rotator (admin saja — endpoint /api/admin/* menolak CS)
+  const loadRotator = useCallback(async () => {
+    if (!isAdminRole) return;
+    try {
+      const res = await rotatorApi.get();
+      setRotatorEnabled(Boolean(res.rotator?.enabled));
+      setRotatorRefs(Array.isArray(res.rotator?.refs) ? res.rotator.refs : []);
+    } catch {
+      // non-fatal: kartu hanya menampilkan keadaan kosong
+    }
+  }, [isAdminRole]);
+
+  useEffect(() => {
+    loadRotator();
+  }, [loadRotator]);
+
+  const toggleRotatorMember = (refCode: string, on: boolean) => {
+    setRotatorRefs((prev) => (on ? [...prev, refCode] : prev.filter((r) => r !== refCode)));
+  };
+
+  const moveRotatorRef = (index: number, dir: -1 | 1) => {
+    setRotatorRefs((prev) => {
+      const arr = [...prev];
+      const j = index + dir;
+      if (j < 0 || j >= arr.length) return prev;
+      [arr[index], arr[j]] = [arr[j], arr[index]];
+      return arr;
+    });
+  };
+
+  const handleSaveRotator = async () => {
+    if (rotatorEnabled && rotatorRefs.length === 0) {
+      showToast('Centang minimal 1 CS untuk rotator aktif', 'error');
+      return;
+    }
+    try {
+      setIsSavingRotator(true);
+      const res = await rotatorApi.save({ enabled: rotatorEnabled, refs: rotatorRefs });
+      setRotatorEnabled(Boolean(res.rotator?.enabled));
+      setRotatorRefs(res.rotator?.refs || []);
+      showToast('Rotator pendaftaran disimpan!');
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan rotator', 'error');
+    } finally {
+      setIsSavingRotator(false);
+    }
+  };
 
   // Persistensi rekening ke server (sebelumnya hanya state lokal / tidak tersimpan)
   const handleToggleBank = async (id: string) => {
@@ -1064,6 +1120,216 @@ export const Settings: React.FC = () => {
               <span>Tambah Akun</span>
             </button>
           </div>
+
+          {/* Rotator Pendaftaran (delegasi otomatis ke CS) — admin saja */}
+          {isAdminRole && (
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1px solid #E2E8F0',
+              padding: '1.5rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+              }}
+            >
+              <div>
+                <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.15rem', margin: '0 0 4px 0', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Shuffle size={18} color="#6D28D9" /> Rotator Pendaftaran
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B', maxWidth: '640px' }}>
+                  Pendaftaran yang masuk <strong>langsung tanpa link CS</strong> (tanpa <code>?ref=</code> atau kode
+                  tidak dikenal) akan didelegasikan otomatis ke CS berikutnya secara bergantian (round-robin) sesuai
+                  urutan di bawah. Pendaftaran lewat link CS tetap milik CS tersebut. Delegasi juga membuat notifikasi
+                  WhatsApp CS bersangkutan ikut terkirim (sesuai setelannya).
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: rotatorEnabled ? '#047857' : '#94A3B8',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={rotatorEnabled}
+                    onChange={(e) => setRotatorEnabled(e.target.checked)}
+                  />
+                  {rotatorEnabled ? 'AKTIF' : 'NONAKTIF'}
+                </label>
+                <button
+                  onClick={handleSaveRotator}
+                  disabled={isSavingRotator}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0.6rem 1.25rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: isSavingRotator ? '#94A3B8' : '#6D28D9',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 700,
+                    cursor: isSavingRotator ? 'wait' : 'pointer',
+                  }}
+                >
+                  {isSavingRotator ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
+                  {isSavingRotator ? 'Menyimpan...' : 'Simpan Rotator'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1.1rem' }}>
+              {/* Urutan rotasi */}
+              <div style={{ flex: '1 1 300px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '0.9rem 1rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  Urutan rotasi ({rotatorRefs.length} CS)
+                </div>
+                {rotatorRefs.length === 0 ? (
+                  <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
+                    Belum ada CS dipilih — pilih dari daftar di samping.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {rotatorRefs.map((refCode, idx) => {
+                      const acc = accounts.find((a) => a.ref_code === refCode);
+                      return (
+                        <div
+                          key={refCode}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E2E8F0',
+                            borderRadius: '9px',
+                            padding: '0.45rem 0.6rem',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '6px',
+                              backgroundColor: '#6D28D9',
+                              color: '#FFFFFF',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {acc ? acc.name : refCode}
+                            <span style={{ fontWeight: 500, color: '#94A3B8', fontSize: '0.75rem' }}> · {refCode}</span>
+                          </span>
+                          <button
+                            onClick={() => moveRotatorRef(idx, -1)}
+                            disabled={idx === 0}
+                            title="Naik"
+                            style={{ border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', padding: '3px 6px', cursor: idx === 0 ? 'not-allowed' : 'pointer', opacity: idx === 0 ? 0.4 : 1, display: 'flex', color: '#475569' }}
+                          >
+                            <ArrowUp size={13} />
+                          </button>
+                          <button
+                            onClick={() => moveRotatorRef(idx, 1)}
+                            disabled={idx === rotatorRefs.length - 1}
+                            title="Turun"
+                            style={{ border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF', borderRadius: '6px', padding: '3px 6px', cursor: idx === rotatorRefs.length - 1 ? 'not-allowed' : 'pointer', opacity: idx === rotatorRefs.length - 1 ? 0.4 : 1, display: 'flex', color: '#475569' }}
+                          >
+                            <ArrowDown size={13} />
+                          </button>
+                          <button
+                            onClick={() => toggleRotatorMember(refCode, false)}
+                            title="Keluarkan dari rotator"
+                            style={{ border: '1px solid #FECACA', backgroundColor: '#FEF2F2', borderRadius: '6px', padding: '3px 6px', cursor: 'pointer', display: 'flex', color: '#DC2626' }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* CS lainnya */}
+              <div style={{ flex: '1 1 300px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '0.9rem 1rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.6rem' }}>
+                  Semua CS — klik untuk ikut rotator
+                </div>
+                {accounts.filter((a) => a.role === 'cs').length === 0 ? (
+                  <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
+                    Belum ada akun CS. Buat lewat tombol <strong>Tambah Akun</strong>.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {accounts
+                      .filter((a) => a.role === 'cs')
+                      .map((a) => {
+                        const inRotator = !!a.ref_code && rotatorRefs.includes(a.ref_code);
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => a.ref_code && toggleRotatorMember(a.ref_code, !inRotator)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              backgroundColor: inRotator ? '#F5F3FF' : '#FFFFFF',
+                              border: `1px solid ${inRotator ? '#C4B5FD' : '#E2E8F0'}`,
+                              borderRadius: '9px',
+                              padding: '0.45rem 0.6rem',
+                              cursor: a.ref_code ? 'pointer' : 'not-allowed',
+                              opacity: a.ref_code ? 1 : 0.55,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              readOnly
+                              checked={inRotator}
+                              disabled={!a.ref_code || !a.is_active}
+                              style={{ cursor: 'pointer', accentColor: '#6D28D9' }}
+                            />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', flex: 1 }}>
+                              {a.name}
+                              <span style={{ fontWeight: 500, color: '#94A3B8', fontSize: '0.75rem' }}>
+                                {' '}· {a.ref_code || 'tanpa ref'}
+                                {!a.is_active ? ' · nonaktif' : ''}
+                              </span>
+                            </span>
+                            {inRotator && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#6D28D9', color: '#FFFFFF', padding: '2px 7px', borderRadius: '6px' }}>
+                                IKUT
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          )}
 
           <div
             style={{

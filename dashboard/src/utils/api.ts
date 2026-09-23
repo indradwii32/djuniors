@@ -785,6 +785,22 @@ export const csWaApi = {
   },
 };
 
+// Rotator pendaftaran — delegasi otomatis pendaftaran tanpa ref ke CS
+export interface RotatorResponse {
+  success: boolean;
+  rotator: { enabled: boolean; refs: string[] };
+  accounts: { id: string; name: string; ref_code: string | null; is_active: number | boolean }[];
+}
+export const rotatorApi = {
+  get: async (): Promise<RotatorResponse> => apiRequest<RotatorResponse>('/admin/rotator'),
+  save: async (payload: {
+    enabled: boolean;
+    refs: string[];
+  }): Promise<{ success: boolean; rotator: { enabled: boolean; refs: string[] } }> => {
+    return apiRequest('/admin/rotator', { method: 'PUT', body: JSON.stringify(payload) });
+  },
+};
+
 // Payments Endpoints
 export const paymentsApi = {
   getAll: async (): Promise<PaymentItem[]> => {

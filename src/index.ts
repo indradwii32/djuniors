@@ -26,6 +26,7 @@ import enrollmentRoutes from './routes/enrollments';
 import paymentRoutes from './routes/payments';
 import formRoutes from './routes/forms';
 import adminAccountRoutes from './routes/admin-accounts';
+import rotatorRoutes from './routes/cs-rotator';
 import csRoutes from './routes/cs';
 import { verifyJWT, getJwtSecret } from './utils/jwt';
 
@@ -142,6 +143,7 @@ app.route('/api/payment-tracking', paymentTrackingRoutes);
 app.route('/api/promo', promoRoutes);
 app.route('/api/notifications', notificationRoutes);
 app.route('/api/levels', levelRoutes);
+app.route('/api/admin/rotator', rotatorRoutes);
 app.route('/api/cms/files', cmsFilesRoutes);
 app.route('/api/cms/icons', cmsIconsRoutes);
 app.route('/api/cms', cmsRoutes);

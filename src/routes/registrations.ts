@@ -8,6 +8,7 @@ import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/au
 import { cacheMiddleware, bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2 } from '../utils/payment';
 import { sendCsWaAuto } from '../utils/cs-wa';
+import { nextRotatorRef } from '../utils/cs-rotator';
 
 const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Public tracking reads are cached for 60s — long enough to absorb repeated
@@ -189,6 +190,14 @@ registrations.post('/', async (c) => {
             'SELECT ref_code FROM admin_accounts WHERE UPPER(ref_code) = UPPER(?) AND is_active = 1'
         ).bind(ref_code.trim()).first();
         if (refRow?.ref_code) storedRefCode = refRow.ref_code as string;
+    }
+
+    // Auto-delegasi: pendaftaran tanpa ref CS valid (langsung/tanpa link)
+    // dirotasi ke CS berikutnya bila admin mengaktifkan rotator
+    // (Pengaturan → Akun Tim → Rotator Pendaftaran). Null-safe: rotator
+    // mati/tanpa anggota → tetap null.
+    if (!storedRefCode) {
+        storedRefCode = await nextRotatorRef(c.env.DB);
     }
 
     // Snapshot rekening bank yang dipilih pendaftar di step terakhir —
