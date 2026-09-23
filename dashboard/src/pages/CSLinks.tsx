@@ -24,13 +24,16 @@ import {
   Settings,
   BookOpen,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   csApi,
   classesApi,
+  adminAccountsApi,
   CsOverview,
   ClassItem,
+  AdminAccountItem,
   buildRefLink,
   buildClassRefLink,
 } from '../utils/api';
@@ -58,14 +61,46 @@ export const CSLinks: React.FC = () => {
   // Multi-pilih kelas: generator bisa membuat beberapa link per kelas sekaligus
   // (bukan hanya satu link umum atau satu kelas saja).
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  // Admin melihat SEMUA CS, jadi halaman ini butuh satu CS terpilih: link hanya
+  // bisa dibuat kalau ada ref_code konkret (tanpa ref, server mengembalikan
+  // agregat tanpa kode link — generator jadi buntu).
+  const [accounts, setAccounts] = useState<AdminAccountItem[]>([]);
+  const [selectedRef, setSelectedRef] = useState<string>('');
+  const [accountsLoaded, setAccountsLoaded] = useState<boolean>(false);
+
+  // Admin: muat daftar CS untuk dipilih.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isAdmin) {
+        setAccountsLoaded(true);
+        return;
+      }
+      try {
+        const res = await adminAccountsApi.list();
+        const csList = (res.accounts || []).filter((a) => a.role === 'cs' && a.is_active);
+        if (cancelled) return;
+        setAccounts(csList);
+        setSelectedRef((prev) => prev || csList[0]?.ref_code || '');
+      } catch {
+        if (!cancelled) setAccounts([]);
+      } finally {
+        if (!cancelled) setAccountsLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
 
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMsg(null);
-      // Halaman ini menampilkan data milik CS yang login (atau ?ref untuk admin).
+      // CS: selalu data milik sendiri. Admin: CS yang dipilih di dropdown.
+      const ref = isAdmin ? selectedRef : undefined;
       const [ovRes, clsRes] = await Promise.allSettled([
-        csApi.getOverview(),
+        csApi.getOverview(ref || undefined),
         classesApi.getAll(),
       ]);
       if (ovRes.status === 'fulfilled') {
@@ -84,11 +119,18 @@ export const CSLinks: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAdmin, selectedRef]);
 
   useEffect(() => {
+    // Tunggu daftar CS termuat dulu (admin) supaya tidak meminta overview tanpa ref.
+    if (!accountsLoaded) return;
+    if (isAdmin && !selectedRef) {
+      setOverview(null);
+      setIsLoading(false);
+      return;
+    }
     load();
-  }, [load]);
+  }, [accountsLoaded, isAdmin, selectedRef, load]);
 
   const copy = async (key: string, text: string) => {
     try {
@@ -124,6 +166,17 @@ export const CSLinks: React.FC = () => {
       return prev.filter((x) => x !== id);
     });
   };
+
+  const selectedAccount = accounts.find((a) => a.ref_code === selectedRef) || null;
+  // Pesan saat tidak ada ref_code: bedakan CS sendiri vs admin yang belum
+  // memilih CS, supaya admin tidak disuruh "hubungi administrator" (dirinya sendiri).
+  const noRefMessage = isAdmin
+    ? accounts.length === 0
+      ? 'Belum ada akun CS aktif. Buat akun CS terlebih dahulu di Pengaturan Sistem → Akun Tim.'
+      : selectedAccount && !selectedAccount.ref_code
+        ? `Akun CS "${selectedAccount.name}" belum memiliki kode link. Atur kode ref-nya di Pengaturan Sistem → Akun Tim.`
+        : 'Pilih CS pada dropdown "Buat link untuk CS" untuk membuat link pendaftaran.'
+    : 'Akun Anda belum memiliki kode link. Hubungi administrator.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -187,24 +240,69 @@ export const CSLinks: React.FC = () => {
           </p>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => navigate('/settings')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0.65rem 1rem',
-              borderRadius: '10px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
-              color: '#475569',
-              fontSize: '0.875rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            <Settings size={16} /> Kelola Akun CS
-          </button>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <div style={{ minWidth: '240px' }}>
+              <label
+                htmlFor="cs-link-account"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  marginBottom: '6px',
+                }}
+              >
+                <Users size={13} /> Buat link untuk CS
+              </label>
+              <select
+                id="cs-link-account"
+                value={selectedRef}
+                onChange={(e) => setSelectedRef(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1E293B',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {accounts.length === 0 && <option value="">— Belum ada akun CS —</option>}
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.ref_code || ''}>
+                    {a.name}
+                    {a.ref_code ? ` (${a.ref_code})` : ' — belum punya kode link'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => navigate('/settings')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0.65rem 1rem',
+                borderRadius: '10px',
+                border: '1px solid #E2E8F0',
+                backgroundColor: '#FFFFFF',
+                color: '#475569',
+                fontSize: '0.875rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <Settings size={16} /> Kelola Akun CS
+            </button>
+          </div>
         )}
       </div>
 
@@ -362,8 +460,18 @@ export const CSLinks: React.FC = () => {
             </div>
 
             {!refCode ? (
-              <div style={{ color: '#64748B', fontSize: '0.9rem' }}>
-                Akun Anda belum memiliki kode link. Hubungi administrator.
+              <div
+                style={{
+                  color: '#92400E',
+                  fontSize: '0.9rem',
+                  backgroundColor: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '10px',
+                  padding: '0.85rem 1rem',
+                  fontWeight: 600,
+                }}
+              >
+                {noRefMessage}
               </div>
             ) : classes.length === 0 ? (
               <div style={{ color: '#64748B', fontSize: '0.9rem' }}>Belum ada kelas aktif yang bisa dibuatkan link.</div>
@@ -582,7 +690,8 @@ export const CSLinks: React.FC = () => {
           <p style={{ color: '#94A3B8', fontSize: '0.8rem', margin: 0, textAlign: 'center' }}>
             {refCode ? (
               <>
-                Statistik dihitung dari pendaftaran dengan kode ref <strong>{refCode}</strong>.
+                Statistik dihitung dari pendaftaran dengan kode ref <strong>{refCode}</strong>
+                {isAdmin && selectedAccount ? <> milik <strong>{selectedAccount.name}</strong></> : null}.
               </>
             ) : (
               <>
@@ -596,7 +705,7 @@ export const CSLinks: React.FC = () => {
       ) : (
         !errorMsg && (
           <div style={{ backgroundColor: '#FFFFFF', padding: '2rem', borderRadius: '16px', border: '1px solid #E2E8F0', textAlign: 'center', color: '#64748B' }}>
-            Akun Anda belum memiliki kode link. Hubungi administrator.
+            {noRefMessage}
           </div>
         )
       )}
