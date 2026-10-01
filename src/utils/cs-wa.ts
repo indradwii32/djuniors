@@ -1,26 +1,61 @@
 // ============================================
-// Djuniors - Notifikasi WhatsApp per-CS (Fonnte)
+// Djuniors - Notifikasi WhatsApp otomatis (Fonnte)
 // ============================================
-// Setelan disimpan di tabel cs_wa_settings (satu baris per akun CS):
-// token Fonnte pribadi + template pesan kustom + sakelar kirim-otomatis.
-// Token kosong = fallback ke token global (settings.fonnte_token / env).
-// Pengiriman otomatis terjadi saat: (a) pendaftaran lewat link CS,
-// (b) pembayaran dikonfirmasi lewat menu Verifikasi.
-// Pesan dirender dengan formatWATemplate — placeholder SATU kurung {nama}.
+// Isi pesan diambil dari editor template (tabel wa_templates) — SATU sumber
+// untuk semua role. Sebelumnya ada dua: editor + cs_wa_settings.tpl_*; dua
+// sumber membuat pesan untuk event yang sama bisa berbeda, dan tidak ada cara
+// tahu mana yang benar. Kolom tpl_* sudah tidak dipakai dan dibiarkan apa
+// adanya (data lama tidak dibuang).
+//
+// Token: milik CS (cs_wa_settings.fonnte_token) = primary; token global
+// (settings.fonnte_token / env) = cadangan, dipakai hanya bila primary kosong
+// atau ditolak Fonnte, supaya notifikasi tetap terkirim.
+//
+// Saklar on/off: kolom wa_templates.is_enabled per template (event).
+// Placeholder memakai satu kurung {nama}.
 
 import { D1Database } from '@cloudflare/workers-types';
-import { sendWAFonnte, getFonnteToken, sendWaWithFallback } from './fonnte';
+import { sendWaWithFallback, getFonnteToken } from './fonnte';
 import { formatWATemplate } from '../routes/notifications';
 
-export type CsWaEvent = 'registration' | 'payment';
+/**
+ * Event notifikasi otomatis + template yang dipakai. Satu event = satu baris
+ * di editor template, jadi menyalakan/mematikan di dashboard langsung
+ * menentukan apakah pesan terkirim.
+ */
+export const CS_WA_EVENT_TEMPLATES = {
+    registration: 'enrollment_confirmed',
+    payment_received: 'payment_received',
+    payment: 'payment_success',
+} as const;
+
+export type CsWaEvent = keyof typeof CS_WA_EVENT_TEMPLATES;
+
+/** Nama template DEFAULT bila barisnya belum pernah dibuat di D1. */
+export const CS_WA_FALLBACK_CONTENT: Record<CsWaEvent, string> = {
+    registration:
+        'Halo {nama_orang_tua}! 👋\n\n' +
+        'Terima kasih, pendaftaran D\'Juniors untuk {nama_anak} (kelas {kelas}, jadwal {jadwal}) ' +
+        'dengan nomor pendaftaran {nomor_pendaftaran} sudah kami terima.\n\n' +
+        'Untuk menyelesaikan pendaftaran, silakan transfer sesuai instruksi dan kirim bukti pembayaran ' +
+        'melalui halaman lacak berikut:\n{link_pembayaran}\n\n' +
+        'Salam,\n{cs_name} - D\'Juniors',
+    payment_received:
+        'Halo {nama_orang_tua}! 🕐\n\n' +
+        'Bukti pembayaran untuk pendaftaran {nomor_pendaftaran} sudah kami terima.\n' +
+        'Pembayaran sedang kami verifikasi.\n\n' +
+        'Salam,\n{cs_name} - D\'Juniors',
+    payment:
+        'Halo {nama_orang_tua}! ✅\n\n' +
+        'Pembayaran pendaftaran D\'Juniors (no. {nomor_pendaftaran}, kelas {kelas}) sebesar {nominal} ' +
+        'sudah kami konfirmasi.\n\n' +
+        'Status: Lunas. Kelas siap diikuti — jadwal akan dikonfirmasi oleh tim kami.\n\n' +
+        'Salam,\n{cs_name} - D\'Juniors',
+};
 
 export interface CsWaSettingsRow {
     admin_account_id: string;
     fonnte_token: string;
-    tpl_registration: string;
-    tpl_payment: string;
-    auto_registration: number;
-    auto_payment: number;
     updated_at?: string;
 }
 
@@ -127,26 +162,22 @@ export function serializeCsWaSettings(row: CsWaSettingsRow | null) {
     return {
         fonnte_token_masked: maskToken(storedToken),
         fonnte_token_set: storedToken.length > 0,
-        tpl_registration: row?.tpl_registration || CS_WA_DEFAULT_TPL_REGISTRATION,
-        tpl_payment: row?.tpl_payment || CS_WA_DEFAULT_TPL_PAYMENT,
-        auto_registration: row ? Boolean(row.auto_registration) : true,
-        auto_payment: row ? Boolean(row.auto_payment) : true,
         is_default: !row,
         updated_at: row?.updated_at || null,
     };
 }
 
-/** Simpan (upsert) setelan milik satu akun CS. Token: '' = biarkan; clear_token = hapus. */
+/**
+ * Simpan (upsert) token milik satu akun CS. Isi template & saklar on/off
+ * TIDAK lagi disimpan di sini — keduanya milik editor template (wa_templates)
+ * dan dipakai bersama oleh admin dan CS. Token: '' = biarkan; clear_token = hapus.
+ */
 export async function saveCsWaSettings(
     db: D1Database,
     accountId: string,
     patch: {
         fonnte_token?: string;
         clear_token?: boolean;
-        tpl_registration?: string;
-        tpl_payment?: string;
-        auto_registration?: boolean;
-        auto_payment?: boolean;
     }
 ): Promise<void> {
     const existing = await getCsWaSettings(db, accountId);
@@ -157,40 +188,15 @@ export async function saveCsWaSettings(
         token = patch.fonnte_token.trim();
     }
 
-    const tplReg =
-        typeof patch.tpl_registration === 'string'
-            ? patch.tpl_registration
-            : existing?.tpl_registration || CS_WA_DEFAULT_TPL_REGISTRATION;
-    const tplPay =
-        typeof patch.tpl_payment === 'string'
-            ? patch.tpl_payment
-            : existing?.tpl_payment || CS_WA_DEFAULT_TPL_PAYMENT;
-    const autoReg =
-        typeof patch.auto_registration === 'boolean'
-            ? patch.auto_registration
-            : existing
-              ? Boolean(existing.auto_registration)
-              : true;
-    const autoPay =
-        typeof patch.auto_payment === 'boolean'
-            ? patch.auto_payment
-            : existing
-              ? Boolean(existing.auto_payment)
-              : true;
-
     await db
         .prepare(
-            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, tpl_registration, tpl_payment, auto_registration, auto_payment, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, updated_at)
+             VALUES (?, ?, CURRENT_TIMESTAMP)
              ON CONFLICT(admin_account_id) DO UPDATE SET
                 fonnte_token = excluded.fonnte_token,
-                tpl_registration = excluded.tpl_registration,
-                tpl_payment = excluded.tpl_payment,
-                auto_registration = excluded.auto_registration,
-                auto_payment = excluded.auto_payment,
                 updated_at = CURRENT_TIMESTAMP`
         )
-        .bind(accountId, token, tplReg, tplPay, autoReg ? 1 : 0, autoPay ? 1 : 0)
+        .bind(accountId, token)
         .run();
 }
 
@@ -221,11 +227,39 @@ async function logWa(
 }
 
 /**
+ * Ambil isi template + status aktif untuk satu event dari editor template.
+ * Saklar is_enabled = 0 berarti notifikasi event ini sengaja dimatikan —
+ * pengiriman dilewati, bukan memakai template bawaan.
+ */
+export async function loadEventTemplateForEvent(
+    db: D1Database,
+    event: CsWaEvent
+): Promise<{ content: string; isEnabled: boolean }> {
+    const templateId = CS_WA_EVENT_TEMPLATES[event];
+    const row = await db
+        .prepare('SELECT content, is_enabled FROM wa_templates WHERE id = ?')
+        .bind(templateId)
+        .first<{ content: string; is_enabled: number }>();
+
+    // Baris belum pernah dibuat (mis. migrasi belum dijalankan) → pakai
+    // default SEKALI, lalu tetap hormati saklarnya: default = nonaktif untuk
+    // event baru, aktif untuk event yang sudah ada sebelumnya.
+    const isEnabled = row ? Boolean(row.is_enabled) : event !== 'payment_received';
+    return { content: row?.content || CS_WA_FALLBACK_CONTENT[event], isEnabled };
+}
+
+const EVENT_LABEL: Record<CsWaEvent, string> = {
+    registration: 'Pendaftaran',
+    payment_received: 'Bukti Pembayaran',
+    payment: 'Pembayaran Lunas',
+};
+
+/**
  * Kirim notifikasi WhatsApp otomatis untuk sebuah pendaftaran memakai
- * setelan milik CS pemilik link (ref_code). Selalu aman dipanggil:
- * kegagalan tidak pernah melempar exception — hasil dikembalikan sebagai
- * { status: sent | failed | skipped | error } dan log ditulis ke tabel
- * notifications (kecuali skipped).
+ * template dari editor template + token milik CS pemilik link (ref_code).
+ * Selalu aman dipanggil: kegagalan tidak pernah melempar exception — hasil
+ * dikembalikan sebagai { status: sent | failed | skipped | error } dan log
+ * ditulis ke tabel notifications (kecuali skipped).
  */
 export async function sendCsWaAuto(
     env: { DB: D1Database; WA_FONNTE_TOKEN?: string; BASE_URL?: string },
@@ -238,6 +272,11 @@ export async function sendCsWaAuto(
     opts?: { baseUrl?: string; csName?: string }
 ): Promise<CsWaSendResult> {
     try {
+        // Cek saklar dulu, sebelum cari CS: event yang dimatikan tidak boleh
+        // menghasilkan panggilan DB tambahan, dan tidak butuh ref/nomor.
+        const { content: template, isEnabled } = await loadEventTemplateForEvent(env.DB, event);
+        if (!isEnabled) return { status: 'skipped', detail: 'notifikasi_dimatikan' };
+
         const refCode = registration.ref_code;
         if (!refCode) return { status: 'skipped', detail: 'tanpa_ref_cs' };
         if (!registration.parent_phone) return { status: 'skipped', detail: 'tanpa_nomor' };
@@ -245,22 +284,14 @@ export async function sendCsWaAuto(
         const account = await findAccountByRef(env.DB, refCode);
         if (!account) return { status: 'skipped', detail: 'cs_tidak_ditemukan' };
 
-        const settings = await getCsWaSettings(env.DB, account.id);
-        if (!settings) return { status: 'skipped', detail: 'cs_belum_setelan' };
-
-        const autoOn = event === 'registration' ? settings.auto_registration : settings.auto_payment;
-        if (!autoOn) return { status: 'skipped', detail: 'otomatis_dimatikan' };
-
-        const template =
-            (event === 'registration' ? settings.tpl_registration : settings.tpl_payment) ||
-            (event === 'registration'
-                ? CS_WA_DEFAULT_TPL_REGISTRATION
-                : CS_WA_DEFAULT_TPL_PAYMENT);
-
         // Token CS = utama. Token global/admin = cadangan: dipakai hanya bila
         // token utama kosong atau Fonnte menolaknya, sehingga notifikasi tetap
         // terkirim walau device Fonnte CS sedang bermasalah.
-        const csToken = (settings.fonnte_token || '').trim();
+        // Setelan token ada/tidak TIDAK menentukan pengiriman — yang menentukan
+        // adalah template + token global. Kalau tidak, CS yang belum pernah
+        // menyimpan token akan diam-diam berhenti menerima notifikasi.
+        const settings = await getCsWaSettings(env.DB, account.id);
+        const csToken = (settings?.fonnte_token || '').trim();
         const globalToken = (await getFonnteToken(env)).trim();
         if (!csToken && !globalToken) return { status: 'skipped', detail: 'token_kosong' };
 
@@ -284,7 +315,7 @@ export async function sendCsWaAuto(
         await logWa(
             env.DB,
             `cs_${event}`,
-            `${event === 'registration' ? 'Pendaftaran' : 'Pembayaran'} → ${registration.registration_number}`,
+            `${EVENT_LABEL[event]} → ${registration.registration_number}`,
             message,
             result.status ? 'sent' : 'failed'
         );

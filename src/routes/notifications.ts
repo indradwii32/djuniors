@@ -450,19 +450,22 @@ notifications.get('/', adminAuthMiddleware, async (c) => {
     return c.json(result.results);
 });
 
-// Get all WA templates (admin)
+// Get all WA templates (admin + CS)
+//
+// `is_enabled` ikut dikembalikan: saklar ini yang menentukan apakah notifikasi
+// otomatis untuk sebuah event terkirim, jadi UI wajib menampilkannya.
 notifications.get('/templates', adminAuthMiddleware, async (c) => {
     const result = await c.env.DB.prepare(
-        'SELECT id, name, content, version, updated_at FROM wa_templates ORDER BY id ASC'
+        'SELECT id, name, content, version, is_enabled, updated_at FROM wa_templates ORDER BY id ASC'
     ).all();
     return c.json(result.results || []);
 });
 
-// Get single WA template by id (admin)
+// Get single WA template by id (admin + CS)
 notifications.get('/templates/:id', adminAuthMiddleware, async (c) => {
     const id = c.req.param('id');
     const template = await c.env.DB.prepare(
-        'SELECT id, name, content, version, updated_at FROM wa_templates WHERE id = ?'
+        'SELECT id, name, content, version, is_enabled, updated_at FROM wa_templates WHERE id = ?'
     ).bind(id).first();
 
     if (!template) {
@@ -471,18 +474,42 @@ notifications.get('/templates/:id', adminAuthMiddleware, async (c) => {
     return c.json(template);
 });
 
-// Update WA template content (admin)
+/**
+ * Update WA template content and/or saklar aktif (admin + CS).
+ *
+ * CS juga boleh menulis. Isi pesan notifikasi pendaftar sama untuk semua CS,
+ * jadi template ini milik bersama — bukan sesuatu yang boleh beda per akun.
+ * Yang tetap per-CS hanya token Fonnte-nya.
+ */
 notifications.put('/templates/:id', adminAuthMiddleware, async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json() as any;
     const { name, content } = body;
+    const hasEnabled = Object.prototype.hasOwnProperty.call(body, 'is_enabled');
+    // Terima hanya boolean atau angka 0/1. String seperti "ya" atau "true"
+    // ditolak: diam-diam dianggap OFF akan mematikan notifikasi tanpa ada yang
+    // menyadarikan — itu lebih buruk daripada menolak request.
+    const isEnabledValid = hasEnabled && (
+        body.is_enabled === true
+        || body.is_enabled === false
+        || body.is_enabled === 1
+        || body.is_enabled === 0
+    );
+    const isEnabled = isEnabledValid ? Boolean(body.is_enabled) : null;
 
-    if (!content || typeof content !== 'string') {
+    // Content opsional kalau yang diubah hanya saklar — menyalakan/mematikan
+    // tidak boleh ikut menimpa isi template.
+    if (content === undefined && !hasEnabled) {
+        return c.json({ error: 'Content or is_enabled is required' }, 400);
+    }
+    if (content !== undefined && (!content || typeof content !== 'string')) {
         return c.json({ error: 'Content is required' }, 400);
     }
-
-    if (content.length > 2000) {
+    if (typeof content === 'string' && content.length > 2000) {
         return c.json({ error: 'Content exceeds maximum limit of 2000 characters' }, 400);
+    }
+    if (hasEnabled && !isEnabledValid) {
+        return c.json({ error: 'is_enabled must be boolean' }, 400);
     }
 
     const existing = await c.env.DB.prepare(
@@ -493,18 +520,31 @@ notifications.put('/templates/:id', adminAuthMiddleware, async (c) => {
         return c.json({ error: 'Template not found' }, 404);
     }
 
-    if (name && typeof name === 'string' && name.trim()) {
-        await c.env.DB.prepare(
-            'UPDATE wa_templates SET name = ?, content = ?, version = 2, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-        ).bind(name.trim(), content, id).run();
-    } else {
-        await c.env.DB.prepare(
-            'UPDATE wa_templates SET content = ?, version = 2, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-        ).bind(content, id).run();
+    // Bentuk SQL dari bagian yang benar-benar dikirim, supaya kolom yang
+    // tidak diubah tidak ikut ter-overwrite.
+    const sets: string[] = [];
+    const binds: unknown[] = [];
+    if (typeof content === 'string') {
+        sets.push('content = ?');
+        binds.push(content);
+        sets.push('version = COALESCE(version, 0) + 1');
     }
+    if (name && typeof name === 'string' && name.trim()) {
+        sets.push('name = ?');
+        binds.push(name.trim());
+    }
+    if (hasEnabled) {
+        sets.push('is_enabled = ?');
+        binds.push(isEnabled ? 1 : 0);
+    }
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+
+    await c.env.DB.prepare(
+        `UPDATE wa_templates SET ${sets.join(', ')} WHERE id = ?`
+    ).bind(...binds, id).run();
 
     const updated = await c.env.DB.prepare(
-        'SELECT id, name, content, version, updated_at FROM wa_templates WHERE id = ?'
+        'SELECT id, name, content, version, is_enabled, updated_at FROM wa_templates WHERE id = ?'
     ).bind(id).first();
 
     return c.json({ success: true, template: updated });

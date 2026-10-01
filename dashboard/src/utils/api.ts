@@ -241,6 +241,12 @@ export interface WATemplate {
   name: string;
   content: string;
   version?: number;
+  /**
+   * Saklar notifikasi otomatis untuk event yang memakai template ini.
+   * false = pesan tidak dikirim otomatis (template tetap bisa dipakai untuk
+   * kirim manual). Undefined = baris belum punya kolom ini (D1 belum dimigrasi).
+   */
+  is_enabled?: number | boolean;
   updated_at?: string;
 }
 
@@ -743,14 +749,13 @@ export const csApi = {
   },
 };
 
-// Setelan Fonnte + pesan WhatsApp per-CS
+/**
+ * Setelan Fonnte milik satu CS. Isi pesan & saklar aktif TIDAK ada di sini —
+ * keduanya milik editor template (wa_templates) dan dipakai bersama semua role.
+ */
 export interface CsWaSettings {
   fonnte_token_masked: string;
   fonnte_token_set: boolean;
-  tpl_registration: string;
-  tpl_payment: string;
-  auto_registration: boolean;
-  auto_payment: boolean;
   is_default: boolean;
   updated_at: string | null;
 }
@@ -773,25 +778,31 @@ export const csWaApi = {
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest<CsWaSettingsResponse>(`/cs/wa-settings${qs}`);
   },
-  saveSettings: async (
-    payload: {
-      ref?: string;
-      fonnte_token?: string;
-      clear_token?: boolean;
-      tpl_registration?: string;
-      tpl_payment?: string;
-      auto_registration?: boolean;
-      auto_payment?: boolean;
-    }
-  ): Promise<{ success: boolean; settings: CsWaSettings }> => {
+  saveSettings: async (payload: {
+    ref?: string;
+    fonnte_token?: string;
+    clear_token?: boolean;
+  }): Promise<{ success: boolean; settings: CsWaSettings }> => {
     const { ref, ...body } = payload;
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest(`/cs/wa-settings${qs}`, { method: 'PUT', body: JSON.stringify(body) });
   },
+  /**
+   * Pratinjau pesan notifikasi. Memakai template dari editor template, sama
+   * dengan yang akan terkirim otomatis.
+   */
   preview: async (
     registrationId: string,
-    event: 'registration' | 'payment'
-  ): Promise<{ success: boolean; phone: string; message: string; ref_code: string | null }> => {
+    event: 'registration' | 'payment_received' | 'payment'
+  ): Promise<{
+    success: boolean;
+    phone: string;
+    message: string;
+    ref_code: string | null;
+    event: string;
+    template_id?: string;
+    auto_enabled?: boolean;
+  }> => {
     return apiRequest(
       `/cs/wa-preview?registration_id=${encodeURIComponent(registrationId)}&event=${event}`
     );
@@ -1059,7 +1070,7 @@ export const notificationsApi = {
   },
   updateTemplate: async (
     id: string,
-    data: { content: string; name?: string }
+    data: { content?: string; name?: string; is_enabled?: boolean }
   ): Promise<{ success: boolean; template?: WATemplate }> => {
     return apiRequest<{ success: boolean; template?: WATemplate }>(
       `/notifications/templates/${encodeURIComponent(id)}`,

@@ -114,6 +114,15 @@ const CS_ALLOWED_PATTERNS: RegExp[] = [
     /^\/api\/payment-tracking(\/|$)/, // antrian verifikasi (di-scope per ref_code)
     /^\/api\/cs(\/|$)/,            // overview link & tracking milik CS
     /^\/api\/health$/,
+    // Editor template WA. Template notifikasi pendaftar milik bersama: isi
+    // pesan untuk semua pendaftar sama, jadi CS ikut menyuntingnya. Yang tetap
+    // per-CS hanya token Fonnte (di /api/cs/wa-settings). Broadcast manual,
+    // log notifikasi, dan pengaturan token global tetap admin-only.
+    /^\/api\/notifications\/templates(\/|$)/,
+    // Status gateway (GET): perlu CS supaya halaman Notifikasi bisa menampilkan
+    // apakah device WA tersambung. Endpoint ini hanya membaca — menulis token
+    // global tetap di luar daftar ini.
+    /^\/api\/notifications\/wa\/status$/,
 ];
 
 // Data referensi yang boleh DIBACA CS (GET saja, tidak boleh mengubah apa pun).

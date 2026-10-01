@@ -15,10 +15,11 @@ import {
     serializeCsWaSettings,
     findAccountByRef,
     renderCsWaMessage,
-    CS_WA_DEFAULT_TPL_REGISTRATION,
-    CS_WA_DEFAULT_TPL_PAYMENT,
+    loadEventTemplateForEvent,
+    CS_WA_EVENT_TEMPLATES,
     CS_WA_PLACEHOLDERS,
     CS_WA_PLACEHOLDER_HINTS,
+    type CsWaEvent,
 } from '../utils/cs-wa';
 
 const cs = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -147,7 +148,13 @@ cs.get('/overview', adminAuthMiddleware, async (c) => {
 // Setelan Fonnte + pesan WhatsApp per-CS
 // ============================================================
 
-/** GET /api/cs/wa-settings — ambil setelan (token selalu masked). */
+/**
+ * GET /api/cs/wa-settings — ambil setelan token milik CS.
+ *
+ * Isi pesan & saklar aktif TIDAK ada di sini: keduanya milik editor template
+ * (wa_templates) yang dipakai bersama oleh admin dan CS. Endpoint ini hanya
+ * menyimpan preferensi device (token Fonnte) per CS.
+ */
 cs.get('/wa-settings', adminAuthMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     const account = await resolveWaAccount(c, payload);
@@ -166,7 +173,7 @@ cs.get('/wa-settings', adminAuthMiddleware, async (c) => {
     });
 });
 
-/** PUT /api/cs/wa-settings — simpan setelan Fonnte + template milik satu CS. */
+/** PUT /api/cs/wa-settings — simpan token Fonnte milik satu CS. */
 cs.put('/wa-settings', adminAuthMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     const account = await resolveWaAccount(c, payload);
@@ -174,19 +181,9 @@ cs.put('/wa-settings', adminAuthMiddleware, async (c) => {
 
     const body = await c.req.json() as any;
 
-    for (const key of ['tpl_registration', 'tpl_payment'] as const) {
-        if (body[key] !== undefined && typeof body[key] === 'string' && body[key].length > 3000) {
-            return c.json({ error: 'Template too long', message: `Template ${key} maksimal 3000 karakter` }, 400);
-        }
-    }
-
     await saveCsWaSettings(c.env.DB, account.id, {
         fonnte_token: typeof body.fonnte_token === 'string' ? body.fonnte_token : undefined,
         clear_token: body.clear_token === true,
-        tpl_registration: typeof body.tpl_registration === 'string' ? body.tpl_registration : undefined,
-        tpl_payment: typeof body.tpl_payment === 'string' ? body.tpl_payment : undefined,
-        auto_registration: typeof body.auto_registration === 'boolean' ? body.auto_registration : undefined,
-        auto_payment: typeof body.auto_payment === 'boolean' ? body.auto_payment : undefined,
     });
 
     const row = await getCsWaSettings(c.env.DB, account.id);
@@ -221,10 +218,15 @@ async function loadScopedRegistration(c: any, payload: any) {
     return { reg, csAccount };
 }
 
-/** GET /api/cs/wa-preview?registration_id=&event= — isi-awal pesan sebelum kirim manual. */
+/**
+ * GET /api/cs/wa-preview?registration_id=&event= — isi-awal pesan sebelum
+ * kirim manual. Memakai template dari editor template, sama persis dengan yang
+ * akan terkirim otomatis — supaya preview tidak berbeda dari reality.
+ */
 cs.get('/wa-preview', adminAuthMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
-    const event = c.req.query('event') === 'registration' ? 'registration' : 'payment';
+    const rawEvent = c.req.query('event');
+    const event = (rawEvent === 'payment_received' ? 'payment_received' : rawEvent === 'registration' ? 'registration' : 'payment') as CsWaEvent;
 
     const loaded = await loadScopedRegistration(c, payload);
     if ('err' in loaded && loaded.err) {
@@ -233,12 +235,7 @@ cs.get('/wa-preview', adminAuthMiddleware, async (c) => {
     }
     const { reg, csAccount } = loaded as { reg: any; csAccount: WaAccount | null };
 
-    let tpl = event === 'registration' ? CS_WA_DEFAULT_TPL_REGISTRATION : CS_WA_DEFAULT_TPL_PAYMENT;
-    if (csAccount) {
-        const row = await getCsWaSettings(c.env.DB, csAccount.id);
-        const stored = (event === 'registration' ? row?.tpl_registration : row?.tpl_payment) || '';
-        if (stored.trim()) tpl = stored;
-    }
+    const { content: tpl, isEnabled } = await loadEventTemplateForEvent(c.env.DB, event);
 
     const baseUrl = (c.env as any).BASE_URL || new URL(c.req.url).origin;
     const message = renderCsWaMessage(tpl, reg, csAccount?.name || 'CS D\'Juniors', baseUrl);
@@ -249,6 +246,8 @@ cs.get('/wa-preview', adminAuthMiddleware, async (c) => {
         message,
         ref_code: reg.ref_code || null,
         event,
+        template_id: CS_WA_EVENT_TEMPLATES[event],
+        auto_enabled: isEnabled,
     });
 });
 

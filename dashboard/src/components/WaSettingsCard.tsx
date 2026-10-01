@@ -1,25 +1,16 @@
 // ============================================================
-// Kartu "Notifikasi WhatsApp (Fonnte)" — dipakai di halaman Link CS.
-// CS: selalu mengelola setelannya sendiri.
-// Admin: memilih CS lewat dropdown → mengelola setelan CS tersebut.
+// Kartu "Token Fonnte" — device WhatsApp milik satu CS.
+//
+// Isi pesan & saklar aktif TIDAK ada di kartu ini. Keduanya milik editor
+// template (Notifikasi → Editor Template), dipakai bersama oleh admin dan CS:
+// pesan notifikasi untuk pendaftar sama untuk semua orang, jadi tidak boleh
+// ada versi per-CS yang bisa berbeda diam-diam. Yang tetap per-CS hanya token
+// Fonnte — device tempat pesan dikirim atas nama CS tersebut.
 // ============================================================
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  MessageCircle,
-  RefreshCw,
-  Save,
-  Send,
-  AlertCircle,
-  CheckCircle2,
-  KeyRound,
-} from 'lucide-react';
-import {
-  csWaApi,
-  adminAccountsApi,
-  AdminAccountItem,
-  CsWaSettingsResponse,
-} from '../utils/api';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, KeyRound, RefreshCw, Save, Send } from 'lucide-react';
+import { csWaApi, adminAccountsApi, AdminAccountItem, CsWaSettingsResponse } from '../utils/api';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -32,16 +23,6 @@ const inputStyle: React.CSSProperties = {
   color: '#1E293B',
   outline: 'none',
   boxSizing: 'border-box',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '0.78rem',
-  fontWeight: 800,
-  color: '#475569',
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.5px',
-  marginBottom: '6px',
 };
 
 interface Props {
@@ -57,56 +38,16 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
 
   const [tokenInput, setTokenInput] = useState('');
   const [clearToken, setClearToken] = useState(false);
-  const [tplReg, setTplReg] = useState('');
-  const [tplPay, setTplPay] = useState('');
-  const [autoReg, setAutoReg] = useState(true);
-  const [autoPay, setAutoPay] = useState(true);
-
   const [testPhone, setTestPhone] = useState('');
   const [notice, setNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  // Variable diklik → disisipkan ke template yang sedang aktif (posisi kursor).
-  const [activeField, setActiveField] = useState<'registration' | 'payment'>('registration');
-  const [lastInserted, setLastInserted] = useState<string | null>(null);
-  const tplRegRef = useRef<HTMLTextAreaElement | null>(null);
-  const tplPayRef = useRef<HTMLTextAreaElement | null>(null);
 
   const showNotice = (text: string, type: 'success' | 'error' = 'success') => {
     setNotice({ text, type });
     setTimeout(() => setNotice(null), 4000);
   };
 
-  /**
-   * Sisipkan variable ke template aktif pada posisi kursor. CS cukup mengklik
-   * variable — tidak perlu mengetik kurung kurawalnya sendiri.
-   */
-  const insertPlaceholder = (token: string) => {
-    const el = activeField === 'registration' ? tplRegRef.current : tplPayRef.current;
-    const setter = activeField === 'registration' ? setTplReg : setTplPay;
-    const current = activeField === 'registration' ? tplReg : tplPay;
-
-    const start = el?.selectionStart ?? current.length;
-    const end = el?.selectionEnd ?? current.length;
-    const next = current.slice(0, start) + token + current.slice(end);
-    setter(next);
-    setLastInserted(token);
-
-    // Kembalikan fokus & letakkan kursor setelah variable yang disisipkan.
-    if (el) {
-      requestAnimationFrame(() => {
-        el.focus();
-        const pos = start + token.length;
-        el.setSelectionRange(pos, pos);
-      });
-    }
-    setTimeout(() => setLastInserted(null), 1500);
-  };
-
   const applyData = useCallback((res: CsWaSettingsResponse) => {
     setData(res);
-    setTplReg(res.settings.tpl_registration);
-    setTplPay(res.settings.tpl_payment);
-    setAutoReg(res.settings.auto_registration);
-    setAutoPay(res.settings.auto_payment);
     setTokenInput('');
     setClearToken(false);
   }, []);
@@ -145,7 +86,7 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
         if (cancelled) return;
         applyData(res);
       } catch (err) {
-        if (!cancelled) showNotice(err instanceof Error ? err.message : 'Gagal memuat setelan WA', 'error');
+        if (!cancelled) showNotice(err instanceof Error ? err.message : 'Gagal memuat token Fonnte', 'error');
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -163,15 +104,11 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
         ref: isAdmin && selectedRef ? selectedRef : undefined,
         fonnte_token: tokenInput.trim() || undefined,
         clear_token: clearToken || undefined,
-        tpl_registration: tplReg,
-        tpl_payment: tplPay,
-        auto_registration: autoReg,
-        auto_payment: autoPay,
       });
       applyData({ ...(data as CsWaSettingsResponse), settings: res.settings });
       setTokenInput('');
       setClearToken(false);
-      showNotice('Setelan WhatsApp tersimpan');
+      showNotice('Token Fonnte tersimpan');
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'Gagal menyimpan', 'error');
     } finally {
@@ -189,14 +126,17 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
         phone: testPhone.trim(),
         ref: isAdmin && selectedRef ? selectedRef : undefined,
       });
-      if (res.success) showNotice(`Pesan tes terkirim (${res.source === 'cs_token' ? 'token CS' : 'token global'})`);
-      else showNotice(res.message || 'Gagal mengirim pesan tes', 'error');
+      if (res.success) {
+        showNotice(
+          `Pesan tes terkirim via ${res.source === 'cs_token' ? 'token CS' : 'token global'}`
+        );
+      } else {
+        showNotice(res.message || 'Gagal mengirim pesan tes', 'error');
+      }
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'Gagal mengirim pesan tes', 'error');
     }
   };
-
-  const placeholders = data?.placeholders || [];
 
   return (
     <div
@@ -207,7 +147,15 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
         border: '1px solid #E2E8F0',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem',
+        }}
+      >
         <div>
           <span
             style={{
@@ -222,19 +170,39 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
               gap: '4px',
             }}
           >
-            <MessageCircle size={14} /> Notifikasi WhatsApp · Fonnte
+            <KeyRound size={14} /> Token Fonnte · Device CS
           </span>
-          <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.2rem', color: '#1E293B', margin: '8px 0 4px 0' }}>
-            Pesan WhatsApp per CS
+          <h3
+            style={{
+              fontFamily: "'Baloo 2', cursive",
+              fontSize: '1.2rem',
+              color: '#1E293B',
+              margin: '8px 0 4px 0',
+            }}
+          >
+            Device WhatsApp milik CS
           </h3>
-          <p style={{ color: '#64748B', fontSize: '0.85rem', margin: 0 }}>
-            Token Fonnte & template pesan dikustomisasi masing-masing CS. Kirim otomatis: pendaftaran lewat link CS
-            dan pembayaran yang dikonfirmasi.
+          <p style={{ color: '#64748B', fontSize: '0.85rem', margin: 0, maxWidth: '58ch' }}>
+            Token Fonnte opsional. Kalau diisi, pesan notifikasi dari CS ini dikirim lewat device
+            tersebut; kalau kosong, sistem memakai token global. Isi pesan &amp; saklar aktif diatur di{' '}
+            <strong>Editor Template</strong>.
           </p>
         </div>
         {isAdmin && (
           <div style={{ minWidth: '230px' }}>
-            <label style={labelStyle}>Kelola setelan CS</label>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px',
+              }}
+            >
+              Kelola device CS
+            </label>
             <select
               value={selectedRef}
               onChange={(e) => setSelectedRef(e.target.value)}
@@ -279,12 +247,28 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
       )}
 
       {isLoading ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748B', marginTop: '1.25rem', fontWeight: 700, fontSize: '0.9rem' }}>
-          <RefreshCw size={16} className="animate-spin" /> Memuat setelan WhatsApp...
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#64748B',
+            marginTop: '1.25rem',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+          }}
+        >
+          <RefreshCw size={16} className="animate-spin" /> Memuat token...
         </div>
       ) : data ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginTop: '1.25rem' }}>
-          {/* Token Fonnte */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.1rem',
+            marginTop: '1.25rem',
+          }}
+        >
           <div
             style={{
               backgroundColor: '#F8FAFC',
@@ -293,10 +277,29 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
               padding: '1rem 1.1rem',
             }}
           >
-            <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                color: '#475569',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '6px',
+              }}
+            >
               <KeyRound size={13} /> Token Fonnte ({data.account.name})
             </label>
-            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.6rem',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
               <input
                 type="password"
                 value={tokenInput}
@@ -304,120 +307,49 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
                 placeholder={
                   data.settings.fonnte_token_set
                     ? `Tersimpan: ${data.settings.fonnte_token_masked} — isi untuk mengganti`
-                    : 'Tempel token Fonnte (dashboard.fonnte.com)'
+                    : 'Kosong — memakai token global'
                 }
                 style={{ ...inputStyle, maxWidth: '380px', flex: '1 1 260px' }}
                 autoComplete="off"
               />
               {data.settings.fonnte_token_set && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#64748B', fontWeight: 700, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={clearToken} onChange={(e) => setClearToken(e.target.checked)} />
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.8rem',
+                    color: '#64748B',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={clearToken}
+                    onChange={(e) => setClearToken(e.target.checked)}
+                  />
                   Hapus token
                 </label>
               )}
             </div>
             <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '6px 0 0 0' }}>
               {data.settings.fonnte_token_set
-                ? 'Token ini dipakai untuk semua pengiriman WA dari CS ini.'
+                ? 'Pesan notifikasi dari CS ini dikirim lewat device ini. Kalau device bermasalah, sistem otomatis ke token global.'
                 : data.global_token_set
-                  ? 'Token CS kosong → memakai token gateway global (Settings → WhatsApp Gateway).'
-                  : 'Belum ada token sama sekali — pengiriman akan dilewati sampai token diisi.'}
+                  ? 'Belum ada token CS → memakai token gateway global.'
+                  : 'Belum ada token sama sekali — notifikasi tidak terkirim sampai token diisi di Settings → WhatsApp Gateway.'}
             </p>
           </div>
 
-          {/* Template: pendaftaran */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1rem 1.1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>Pesan: pendaftaran diterima (otomatis)</label>
-              <Toggle checked={autoReg} onChange={setAutoReg} label={autoReg ? 'Kirim otomatis: ON' : 'Kirim otomatis: OFF'} />
-            </div>
-            <textarea
-              ref={tplRegRef}
-              value={tplReg}
-              onChange={(e) => setTplReg(e.target.value)}
-              onFocus={() => setActiveField('registration')}
-              rows={7}
-              maxLength={3000}
-              style={{
-                ...inputStyle,
-                marginTop: '0.6rem',
-                resize: 'vertical',
-                lineHeight: 1.5,
-                border: activeField === 'registration' ? '1px solid #6D28D9' : '1px solid #E2E8F0',
-              }}
-            />
-            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px', textAlign: 'right' }}>{tplReg.length}/3000</div>
-          </div>
-
-          {/* Template: pembayaran */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1rem 1.1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>Pesan: pembayaran dikonfirmasi (otomatis)</label>
-              <Toggle checked={autoPay} onChange={setAutoPay} label={autoPay ? 'Kirim otomatis: ON' : 'Kirim otomatis: OFF'} />
-            </div>
-            <textarea
-              ref={tplPayRef}
-              value={tplPay}
-              onChange={(e) => setTplPay(e.target.value)}
-              onFocus={() => setActiveField('payment')}
-              rows={7}
-              maxLength={3000}
-              style={{
-                ...inputStyle,
-                marginTop: '0.6rem',
-                resize: 'vertical',
-                lineHeight: 1.5,
-                border: activeField === 'payment' ? '1px solid #6D28D9' : '1px solid #E2E8F0',
-              }}
-            />
-            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '4px', textAlign: 'right' }}>{tplPay.length}/3000</div>
-          </div>
-
-          {/* Placeholder */}
-          <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '1rem 1.1rem', backgroundColor: '#F8FAFC' }}>
-            <label style={labelStyle}>Variable yang tersedia — klik untuk menyisipkan</label>
-            <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '0 0 0.7rem 0' }}>
-              Klik salah satu variable untuk menambahkannya ke{' '}
-              <strong>{activeField === 'registration' ? 'template pendaftaran' : 'template pembayaran'}</strong> pada posisi kursor.
-              Klik kotak teks lain untuk memindahkan tujuan penyisipan.
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {placeholders.map((p) => {
-                const hint = data?.placeholder_hints?.[p];
-                const isJustInserted = lastInserted === p;
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => insertPlaceholder(p)}
-                    title={hint ? `${hint.label} — contoh: ${hint.example}` : `Sisipkan ${p}`}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: '2px',
-                      padding: '6px 10px',
-                      borderRadius: '9px',
-                      border: `1px solid ${isJustInserted ? '#6BCB77' : '#DDD6FE'}`,
-                      backgroundColor: isJustInserted ? '#ECFDF5' : '#FFFFFF',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <code style={{ fontSize: '0.78rem', fontWeight: 800, color: isJustInserted ? '#047857' : '#6D28D9' }}>
-                      {p}
-                    </code>
-                    <span style={{ fontSize: '0.7rem', color: '#64748B', fontWeight: 600 }}>
-                      {hint ? hint.label : 'Variabel template'}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Aksi */}
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+            }}
+          >
             <button
               onClick={handleSave}
               disabled={isSaving || (isAdmin && !selectedRef)}
@@ -435,8 +367,12 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
                 cursor: isSaving ? 'wait' : 'pointer',
               }}
             >
-              {isSaving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
-              {isSaving ? 'Menyimpan...' : 'Simpan Setelan'}
+              {isSaving ? (
+                <RefreshCw size={15} className="animate-spin" />
+              ) : (
+                <Save size={15} />
+              )}
+              {isSaving ? 'Menyimpan...' : 'Simpan Token'}
             </button>
 
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -470,28 +406,16 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
           {data.settings.updated_at && (
             <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>
               Terakhir disimpan: {new Date(data.settings.updated_at + 'Z').toLocaleString('id-ID')}
-              {data.settings.is_default ? ' · (memakai template bawaan)' : ''}
             </p>
           )}
         </div>
       ) : (
         <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '1rem' }}>
-          {isAdmin ? 'Pilih CS untuk mengelola setelannya.' : 'Setelan belum tersedia.'}
+          {isAdmin ? 'Pilih CS untuk mengelola tokennya.' : 'Token belum tersedia.'}
         </p>
       )}
     </div>
   );
 };
-
-const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string }> = ({
-  checked,
-  onChange,
-  label,
-}) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 700, color: checked ? '#047857' : '#94A3B8', cursor: 'pointer' }}>
-    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    {label}
-  </label>
-);
 
 export default WaSettingsCard;

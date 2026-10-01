@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS wa_templates (
     name TEXT NOT NULL,
     content TEXT NOT NULL,
     version INTEGER DEFAULT 1,
+    is_enabled INTEGER NOT NULL DEFAULT 1,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

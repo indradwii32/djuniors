@@ -257,12 +257,21 @@ paymentTracking.post('/', async (c) => {
     // New proof changes tracking data — invalidate the registrations cache.
     await bumpCacheVersion(c.env, 'registrations');
 
+    // Kabari pendaftar bahwa bukti sudah masuk dan sedang diverifikasi.
+    // Template + saklar aktif diambil dari editor template; kalau event ini
+    // dimatikan di sana, pengiriman dilewati. Gagal kirim tidak pernah
+    // memblokir unggah bukti — pendaftar tetap melihat respons sukses di bawah.
+    const waNotification = await sendCsWaAuto(c.env, registration, 'payment_received', {
+        baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin,
+    });
+
     return c.json({
         success: true,
         tracking_id: trackingId,
         registration_number: registrationNumber,
         proof_url: proofUrl,
         amount: finalAmount,
+        wa_notification: waNotification,
         message: 'Bukti pembayaran berhasil dikirim dan menunggu konfirmasi admin'
     }, 201);
 });

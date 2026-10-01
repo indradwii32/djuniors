@@ -23,6 +23,7 @@ import {
   Save,
   Check,
   Info,
+  BellRing,
 } from 'lucide-react';
 import {
   notificationsApi,
@@ -82,6 +83,23 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
     ],
     content: `💳 *Instruksi Pembayaran*\n\nHalo {nama}!\n\nUntuk menyelesaikan pendaftaran (*{nomor_pendaftaran}*), silakan transfer melalui *{metode_pembayaran}* ke:\n\n🏦 Bank: *{bank}*\n📄 Rekening: *{rekening}*\n💰 Tagihan: *Rp {tagihan_akhir}*\n🔖 Kode: *{nomor_pendaftaran}*\n\n⚠️ *PENTING:*\nTransfer tepat sampai digit terakhir agar pembayaran bisa otomatis terdeteksi!\n\n📸 Konfirmasi & upload bukti transfer di: {link_pembayaran}`,
   },
+  payment_received: {
+    id: 'payment_received',
+    name: 'Bukti Pembayaran Diterima',
+    badge: '🕐 Menunggu Verifikasi',
+    description:
+      'Dikirim otomatis saat orang tua mengunggah bukti pembayaran, sebelum diverifikasi. Saklar notifikasi default-nya nonaktif.',
+    placeholders: [
+      '{nama}',
+      '{nama_orang_tua}',
+      '{nomor_pendaftaran}',
+      '{total_transfer}',
+      '{nama_bank}',
+      '{nama_pemilik_rekening}',
+      '{status_pembayaran}',
+    ],
+    content: `🕐 *Bukti Pembayaran Diterima*\n\nHalo {nama_orang_tua}!\n\nBukti transfer untuk pendaftaran *{nomor_pendaftaran}* sudah kami terima.\n💰 Nominal: *{total_transfer}*\n🏦 {nama_bank} — {nama_pemilik_rekening}\n\n⏳ Pembayaran sedang kami verifikasi. Anda akan diberi tahu segera setelah selesai.\n\nSalam,\n{cs_name} - D'Juniors`,
+  },
   payment_success: {
     id: 'payment_success',
     name: 'Konfirmasi Pembayaran Diterima',
@@ -106,6 +124,17 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
     placeholders: ['{nama}', '{kode_promo}', '{diskon}'],
     content: `🎉 *Promo Spesial!* 🎉\n\nHalo {nama}!\n\nGunakan kode *{kode_promo}* untuk mendapatkan diskon *{diskon}*!\n\nBerlaku terbatas. Jangan sampai kehabisan! ⏰`,
   },
+};
+
+/**
+ * Template yang dipakai notifikasi OTOMATIS ke pendaftar, dan saat pesan dikirim.
+ * tiga baris ini = tiga notifikasi yang dikirim ke customer. Saklar aktif ada di
+ * tiap template, jadi mengaktifkan/mematikan di editor = mematikan notifikasi itu.
+ */
+export const AUTO_NOTIFY_EVENTS: Record<string, { label: string; templateId: string }> = {
+  enrollment_confirmed: { label: 'Pendaftaran diterima', templateId: 'enrollment_confirmed' },
+  payment_received: { label: 'Bukti pembayaran masuk (menunggu verifikasi)', templateId: 'payment_received' },
+  payment_success: { label: 'Pembayaran lunas dikonfirmasi', templateId: 'payment_success' },
 };
 
 const QUICK_TEMPLATES = [
@@ -334,8 +363,11 @@ export const Notifications: React.FC = () => {
   const [isCheckingWa, setIsCheckingWa] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Active Tab: 'manual' | 'bulk' | 'templates' | 'cs'
-  const [activeTab, setActiveTab] = useState<'manual' | 'bulk' | 'templates' | 'cs'>('manual');
+  // Active Tab: 'manual' | 'bulk' | 'templates'
+  // Tab 'cs' (Pesan WhatsApp per CS) sudah dihapus: isi pesan & saklar aktif
+  // kini satu sumber di editor template, dipakai bersama admin dan CS. Yang
+  // tersisa per-CS hanya device Fonnte (WaSettingsCard, khusus role CS).
+  const [activeTab, setActiveTab] = useState<'manual' | 'bulk' | 'templates'>('manual');
 
   // Template Editor States
   const [templates, setTemplates] = useState<WATemplate[]>([]);
@@ -365,41 +397,15 @@ export const Notifications: React.FC = () => {
 
   // Load Initial Data
   const loadData = useCallback(async (isRefresh = false) => {
-    // Role CS tidak memakai modul broadcast/template global (admin-only) —
-    // cukup setelan per-CS yang dimuat oleh WaSettingsCard.
-    if (isCS) {
-      setIsLoading(false);
-      return;
-    }
     try {
       if (isRefresh) setIsRefreshing(true);
       else setIsLoading(true);
 
-      const [notifsRes, promosRes, studentsRes, waRes, tmplsRes] = await Promise.allSettled([
-        notificationsApi.getAll(),
-        promosApi.getAll(),
-        studentsApi.getAll(),
+      // Dua hasil yang selalu dibutuhkan, apa pun role-nya.
+      const [waRes, tmplsRes] = await Promise.allSettled([
         notificationsApi.getWaStatus(),
         notificationsApi.getTemplates(),
       ]);
-
-      if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
-        setNotifications(notifsRes.value);
-      } else {
-        setNotifications([]);
-      }
-
-      if (promosRes.status === 'fulfilled' && Array.isArray(promosRes.value)) {
-        setPromos(promosRes.value);
-        if (promosRes.value.length > 0 && !selectedPromoId) {
-          const firstActive = promosRes.value.find((p) => Boolean(p.is_active));
-          if (firstActive) setSelectedPromoId(firstActive.id);
-        }
-      }
-
-      if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
-        setStudents(studentsRes.value);
-      }
 
       if (waRes.status === 'fulfilled') {
         setWaConnected(waRes.value.connected);
@@ -422,13 +428,42 @@ export const Notifications: React.FC = () => {
           setEditorName(DEFAULT_TEMPLATES_MAP[currentSelectedId].name);
         }
       }
+
+      // Sisa modul (broadcast manual, log, promo, siswa) hanya untuk admin.
+      // Untuk CS request-nya tidak dikirim sama sekali — bukan dikirim lalu
+      // Expect 403, supaya tidak memenuhi Network tab dengan error.
+      if (isCS) return;
+
+      const [notifsRes, promosRes, studentsRes] = await Promise.allSettled([
+        notificationsApi.getAll(),
+        promosApi.getAll(),
+        studentsApi.getAll(),
+      ]);
+
+      if (notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value)) {
+        setNotifications(notifsRes.value);
+      } else {
+        setNotifications([]);
+      }
+
+      if (promosRes.status === 'fulfilled' && Array.isArray(promosRes.value)) {
+        setPromos(promosRes.value);
+        if (promosRes.value.length > 0 && !selectedPromoId) {
+          const firstActive = promosRes.value.find((p) => Boolean(p.is_active));
+          if (firstActive) setSelectedPromoId(firstActive.id);
+        }
+      }
+
+      if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
+        setStudents(studentsRes.value);
+      }
     } catch {
       // Keep state resilient
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [selectedPromoId, selectedTemplateId]);
+  }, [isCS, selectedPromoId, selectedTemplateId]);
 
   useEffect(() => {
     loadData();
@@ -588,6 +623,40 @@ export const Notifications: React.FC = () => {
     }
   };
 
+  /**
+   * Nyalakan / matikan notifikasi otomatis untuk satu template.
+   *
+   * Saklar dikirim sendirian (tanpa content) supaya backend tidak ikut
+   * menimpa isi template yang mungkin belum tersimpan. Status di server yang
+   * jadi acuan — kalau gagal, saklar dikembalikan ke nilai sebelumnya.
+   */
+  const handleToggleTemplateEnabled = async (templateId: string, next: boolean) => {
+    const prev = templates.find((t) => t.id === templateId)?.is_enabled;
+    setTemplates((cur) =>
+      cur.map((t) => (t.id === templateId ? { ...t, is_enabled: next ? 1 : 0 } : t))
+    );
+    try {
+      const res = await notificationsApi.updateTemplate(templateId, { is_enabled: next });
+      if (res.template) {
+        setTemplates((cur) =>
+          cur.map((t) => (t.id === templateId ? { ...t, ...res.template } : t))
+        );
+      }
+      const ev = Object.values(AUTO_NOTIFY_EVENTS).find((e) => e.templateId === templateId);
+      showToast(
+        ev
+          ? `Notifikasi "${ev.label}" ${next ? 'diaktifkan' : 'dimatikan'}.`
+          : `Template ${next ? 'diaktifkan' : 'dimatikan'}.`,
+        next ? 'success' : 'info'
+      );
+    } catch (err) {
+      setTemplates((cur) =>
+        cur.map((t) => (t.id === templateId ? { ...t, is_enabled: prev } : t))
+      );
+      showToast(err instanceof Error ? err.message : 'Gagal mengubah status notifikasi', 'error');
+    }
+  };
+
   // Quick Select Student as Recipient
   const handleSelectStudentRecipient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const studentId = e.target.value;
@@ -702,14 +771,681 @@ export const Notifications: React.FC = () => {
 
   const selectedPromoObj = promos.find((p) => p.id === selectedPromoId);
   const selectedTemplateMeta = DEFAULT_TEMPLATES_MAP[selectedTemplateId] || DEFAULT_TEMPLATES_MAP['welcome'];
+  // Kolom is_enabled belum ada di D1 lama; default = 1 supaya tampilan tidak
+  // salah aktif sebelum migrasi dijalankan.
+  const isSelectedTemplateEnabled = (() => {
+    const row = templates.find((t) => t.id === selectedTemplateId);
+    if (!row || row.is_enabled === undefined || row.is_enabled === null) return true;
+    return Boolean(row.is_enabled);
+  })();
   const activePromoCount = promos.filter((p) => Boolean(p.is_active)).length;
 
   // ============================================================
-  // Tampilan khusus role CS: hanya setelan notifikasi miliknya
+
+  // Panel editor template. Dipakai di dua tempat: tab admin dan tampilan CS.
+  // Dideklarasikan sebagai variabel supaya isinya tidak pernah terduplikasi
+  // dan tidak bisa berbeda antara admin dan CS.
+  const templateEditor = (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+        gap: '1.5rem',
+      }}
+    >
+      {/* Left Form: Template List & Editor */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.25rem', fontWeight: 700, color: '#1E293B', margin: 0 }}>
+              Editor Template WhatsApp
+            </h3>
+            <span
+              style={{
+                padding: '2px 8px',
+                borderRadius: '6px',
+                backgroundColor: '#EFF6FF',
+                color: '#2563EB',
+                fontSize: '0.725rem',
+                fontWeight: 700,
+              }}
+            >
+              Cloudflare D1 Synced
+            </span>
+          </div>
+          <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
+            Pilih template untuk mengubah teks pesan otomatis, format WhatsApp (*bold*, _italic_), dan tag dinamis.
+          </p>
+        </div>
+
+        {/* Template Selector Grid / Pills */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.5rem' }}>
+            Pilih Template Pesan:
+          </label>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '8px',
+            }}
+          >
+            {Object.keys(DEFAULT_TEMPLATES_MAP).map((tmplKey) => {
+              const def = DEFAULT_TEMPLATES_MAP[tmplKey];
+              const tmplData = templates.find((t) => t.id === tmplKey);
+              const isSelected = selectedTemplateId === tmplKey;
+              const displayName = tmplData?.name || def.name;
+
+              return (
+                <button
+                  key={tmplKey}
+                  type="button"
+                  onClick={() => handleSelectTemplate(tmplKey)}
+                  style={{
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '10px',
+                    border: isSelected ? '2px solid #4A90D9' : '1px solid #CBD5E1',
+                    backgroundColor: isSelected ? '#EFF6FF' : '#F8FAFC',
+                    color: isSelected ? '#1E40AF' : '#334155',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: isSelected ? '0 2px 8px rgba(74, 144, 217, 0.2)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{def.badge}</span>
+                    {isSelected && <Check size={14} color="#4A90D9" />}
+                  </div>
+                  <span style={{ fontSize: '0.725rem', color: isSelected ? '#3B82F6' : '#64748B', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {displayName}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Panel status notifikasi otomatis — hanya untuk template yang dipakai event */}
+        {AUTO_NOTIFY_EVENTS[selectedTemplateId] && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #4A90D9',
+              borderRadius: '12px',
+              padding: '0.85rem 1rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BellRing size={16} color="#4A90D9" />
+              <div>
+                <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#1E293B' }}>
+                  Notifikasi otomatis ke customer
+                </div>
+                <div style={{ fontSize: '0.725rem', color: '#64748B' }}>
+                  Aktif untuk event: <strong>{AUTO_NOTIFY_EVENTS[selectedTemplateId].label}</strong>
+                </div>
+              </div>
+            </div>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                color: isSelectedTemplateEnabled ? '#047857' : '#94A3B8',
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={isSelectedTemplateEnabled}
+                onChange={(e) => handleToggleTemplateEnabled(selectedTemplateId, e.target.checked)}
+              />
+              {isSelectedTemplateEnabled ? 'AKTIF — dikirim ke customer' : 'NONAKTIF — tidak dikirim'}
+            </label>
+          </div>
+        )}
+
+        {/* Template Information Card */}
+        {selectedTemplateMeta && (
+          <div
+            style={{
+              backgroundColor: '#F0F9FF',
+              borderRadius: '12px',
+              padding: '0.85rem 1rem',
+              border: '1px solid #BAE6FD',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Info size={15} color="#0284C7" />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369A1' }}>
+                {selectedTemplateMeta.name} (Slug: <code>{selectedTemplateId}</code>)
+              </span>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: '#0C4A6E', margin: 0, lineHeight: 1.4 }}>
+              {selectedTemplateMeta.description}
+            </p>
+            <div>
+              <div style={{ fontSize: '0.725rem', fontWeight: 700, color: '#0369A1', marginBottom: '4px' }}>
+                Tag Placeholder Template Ini (Klik untuk Menyisipkan):
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                {selectedTemplateMeta.placeholders.map((ph) => (
+                  <button
+                    key={ph}
+                    type="button"
+                    className="btn-touch-sm"
+                    onClick={() => handleInsertPlaceholder(ph)}
+                    title={`Klik untuk menyisipkan ${ph}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: '1px dashed #0284C7',
+                      backgroundColor: '#FFFFFF',
+                      color: '#0369A1',
+                      fontSize: '0.725rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#E0F2FE';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    + {ph}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Collapsible All Placeholders Reference */}
+            <details style={{ marginTop: '0.35rem' }}>
+              <summary
+                style={{
+                  fontSize: '0.725rem',
+                  fontWeight: 700,
+                  color: '#0284C7',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                📚 Lihat Semua Placeholder Sistem yang Tersedia ({ALL_PLACEHOLDERS_CATEGORIES.reduce((acc, c) => acc + c.items.length, 0)} tag)
+              </summary>
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                  backgroundColor: '#FFFFFF',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #BAE6FD',
+                }}
+              >
+                {ALL_PLACEHOLDERS_CATEGORIES.map((cat) => (
+                  <div key={cat.category}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0369A1', marginBottom: '3px' }}>
+                      {cat.category}:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {cat.items.map((item) => (
+                        <button
+                          key={item.tag}
+                          type="button"
+                          className="btn-touch-sm"
+                          onClick={() => handleInsertPlaceholder(item.tag)}
+                          title={`${item.tag} - ${item.desc}`}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '5px',
+                            border: '1px solid #E0F2FE',
+                            backgroundColor: '#F0F9FF',
+                            color: '#0369A1',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#BAE6FD';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F0F9FF';
+                          }}
+                        >
+                          <code>{item.tag}</code>
+                          <span style={{ fontSize: '0.65rem', color: '#64748B' }}>({item.desc})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
+        )}
+
+        {/* Template Name (Optional Edit) */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+            Nama / Judul Template:
+          </label>
+          <input
+            type="text"
+            value={editorName}
+            onChange={(e) => setEditorName(e.target.value)}
+            placeholder="Nama template..."
+            style={{
+              width: '100%',
+              padding: '0.65rem 0.85rem',
+              borderRadius: '10px',
+              border: '1px solid #CBD5E1',
+              fontSize: '0.875rem',
+              outline: 'none',
+              backgroundColor: '#FFFFFF',
+            }}
+          />
+        </div>
+
+        {/* Formatting & Emoji Toolbar */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
+              Toolbar Format WhatsApp:
+            </span>
+            <span style={{ fontSize: '0.725rem', color: '#94A3B8' }}>
+              Gunakan untuk mempercantik pesan
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn-touch-sm"
+              onClick={() => handleInsertFormat('*', '*')}
+              title="Format Tebal (*bold*)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: '#F8FAFC',
+                color: '#1E293B',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              *B* Tebal
+            </button>
+            <button
+              type="button"
+              className="btn-touch-sm"
+              onClick={() => handleInsertFormat('_', '_')}
+              title="Format Miring (_italic_)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: '#F8FAFC',
+                color: '#1E293B',
+                fontSize: '0.75rem',
+                fontStyle: 'italic',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              _I_ Miring
+            </button>
+            <button
+              type="button"
+              className="btn-touch-sm"
+              onClick={() => handleInsertFormat('~', '~')}
+              title="Format Coret (~strikethrough~)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #CBD5E1',
+                backgroundColor: '#F8FAFC',
+                color: '#1E293B',
+                fontSize: '0.75rem',
+                textDecoration: 'line-through',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              ~S~ Coret
+            </button>
+
+            <div style={{ height: '16px', width: '1px', backgroundColor: '#CBD5E1', margin: '0 2px' }} />
+
+            {['👋', '🎉', '🚀', '📚', '⏰', '💳', '💰', '✅', '📞', '🌐', '🧮', '💪', '🔔'].map((em) => (
+              <button
+                key={em}
+                type="button"
+                className="btn-touch-sm"
+                onClick={() => handleInsertEmoji(em)}
+                title={`Sisipkan emoji ${em}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '34px',
+                  minHeight: '34px',
+                  padding: '4px 6px',
+                  borderRadius: '6px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Template Content Textarea */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <label style={{ fontSize: '0.825rem', fontWeight: 700, color: '#334155' }}>
+              Isi Konten Template: <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                color: editorContent.length > 2000 ? '#EF4444' : '#64748B',
+                fontWeight: editorContent.length > 2000 ? 800 : 500,
+              }}
+            >
+              {editorContent.length} / 2000 karakter
+            </span>
+          </div>
+          <textarea
+            ref={editorTextareaRef}
+            rows={10}
+            placeholder="Tuliskan isi template pesan WhatsApp..."
+            value={editorContent}
+            onChange={(e) => setEditorContent(e.target.value)}
+            required
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '10px',
+              border: editorContent.length > 2000 ? '1.5px solid #EF4444' : '1px solid #CBD5E1',
+              fontSize: '0.875rem',
+              outline: 'none',
+              resize: 'vertical',
+              backgroundColor: '#FFFFFF',
+              lineHeight: 1.5,
+              fontFamily: 'inherit',
+            }}
+          />
+        </div>
+
+        {/* Action Buttons: Reset & Save */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={handleResetTemplate}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0.65rem 1rem',
+              borderRadius: '10px',
+              border: '1px solid #CBD5E1',
+              backgroundColor: '#F8FAFC',
+              color: '#475569',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F1F5F9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#F8FAFC';
+            }}
+          >
+            <RotateCcw size={15} />
+            <span>Reset ke Default</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveTemplate}
+            disabled={isSavingTemplate || editorContent.length > 2000}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0.75rem 1.6rem',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: '#6BCB77',
+              color: '#FFFFFF',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: isSavingTemplate || editorContent.length > 2000 ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 14px rgba(107, 203, 119, 0.4)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {isSavingTemplate ? (
+              <RefreshCw size={16} className="animate-spin" />
+            ) : (
+              <Save size={16} />
+            )}
+            <span>{isSavingTemplate ? 'Menyimpan ke DB...' : 'Simpan Perubahan Template'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Right: Live WhatsApp Chat Simulator Preview */}
+      <div
+        style={{
+          backgroundColor: '#ECE5DD',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          border: '1px solid #D1D7DB',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          minHeight: '450px',
+        }}
+      >
+        {/* WhatsApp App Header Mock */}
+        <div
+          style={{
+            backgroundColor: '#075E54',
+            color: '#FFFFFF',
+            borderRadius: '10px 10px 0 0',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            margin: '-1.5rem -1.5rem 1rem -1.5rem',
+          }}
+        >
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.1rem',
+            }}
+          >
+            🧮
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Djuniors Learning Center</div>
+            <div style={{ fontSize: '0.7rem', color: '#A7F3D0' }}>
+              Simulasi WhatsApp Gateway (Live Preview)
+            </div>
+          </div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#A7F3D0' }}>Official</div>
+        </div>
+
+        {/* Chat Messages Body */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Date Stamp */}
+          <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
+            <span
+              style={{
+                backgroundColor: 'rgba(225, 245, 254, 0.92)',
+                padding: '3px 10px',
+                borderRadius: '8px',
+                fontSize: '0.7rem',
+                color: '#54656F',
+                fontWeight: 600,
+              }}
+            >
+              PREVIEW TEMPLATE: {selectedTemplateMeta?.name || selectedTemplateId}
+            </span>
+          </div>
+
+          {/* Message Bubble */}
+          <div
+            style={{
+              alignSelf: 'flex-end',
+              maxWidth: '90%',
+              backgroundColor: '#DCF8C6',
+              borderRadius: '10px 0px 10px 10px',
+              padding: '0.85rem 1.1rem',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.875rem',
+                color: '#111B21',
+                lineHeight: 1.5,
+                wordBreak: 'break-word',
+              }}
+            >
+              {renderFormattedWhatsAppText(editorContent)}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '4px',
+                marginTop: '6px',
+              }}
+            >
+              <span style={{ fontSize: '0.65rem', color: '#667781' }}>10:30</span>
+              <CheckCircle2 size={12} color="#53BDEB" />
+            </div>
+          </div>
+        </div>
+
+        {/* Live Sample Notice footer */}
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '0.6rem 0.75rem',
+            fontSize: '0.725rem',
+            color: '#475569',
+            backgroundColor: 'rgba(255, 255, 255, 0.75)',
+            borderRadius: '10px',
+            marginTop: '1rem',
+            lineHeight: 1.4,
+          }}
+        >
+          💡 <strong>Simulasi Otomatis:</strong> Tag seperti <code>{'{nomor_pendaftaran}'}</code>, <code>{'{tagihan_akhir}'}</code>, <code>{'{metode_pembayaran}'}</code>, <code>{'{link_pembayaran}'}</code> digantikan dengan nilai data transaksi asli saat dikirim via WhatsApp Fonnte API.
+        </div>
+      </div>
+    </div>
+  );
+  // Tampilan khusus role CS: editor template (dipakai bersama admin) +
+  // device Fonnte miliknya sendiri.
   // ============================================================
   if (isCS) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+        {toastMessage && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '24px',
+              right: '24px',
+              zIndex: 9999,
+              backgroundColor:
+                toastMessage.type === 'success'
+                  ? '#6BCB77'
+                  : toastMessage.type === 'error'
+                    ? '#EF4444'
+                    : '#4A90D9',
+              color: '#FFFFFF',
+              padding: '0.9rem 1.4rem',
+              borderRadius: '12px',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+            }}
+          >
+            {toastMessage.type === 'success' ? (
+              <CheckCircle2 size={18} />
+            ) : toastMessage.type === 'error' ? (
+              <AlertCircle size={18} />
+            ) : (
+              <Sparkles size={18} />
+            )}
+            <span>{toastMessage.text}</span>
+          </div>
+        )}
+
         <div
           style={{
             background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
@@ -734,7 +1470,7 @@ export const Notifications: React.FC = () => {
             }}
           >
             <MessageSquare size={14} color="#25D366" />
-            <span>Notifikasi WhatsApp Saya</span>
+            <span>Notifikasi WhatsApp</span>
           </div>
           <h2
             style={{
@@ -745,12 +1481,31 @@ export const Notifications: React.FC = () => {
               margin: '0 0 0.5rem 0',
             }}
           >
-            Setelan Notifikasi WhatsApp 📲
+            Template & Notifikasi 📲
           </h2>
           <p style={{ margin: 0, color: '#CBD5E1', fontSize: '0.95rem', lineHeight: 1.5 }}>
-            Atur token Fonnte dan template pesan milik Anda sendiri. Notifikasi otomatis untuk
-            pendaftaran dari link Anda akan memakai template & token ini.
+            Tentukan isi pesan yang dikirim ke customer, dan nyalakan atau matikan tiap notifikasi.
+            Template ini dipakai bersama dengan admin, jadi pelanggan dari semua CS mendapat pesan
+            yang sama.
           </p>
+        </div>
+
+        {/* Editor template — sama persis dengan yang dilihat admin. */}
+        <div>
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: '#64748B',
+              margin: '0 0 1rem 0',
+              lineHeight: 1.5,
+            }}
+          >
+            Tiga template di bawah dipakai untuk notifikasi otomatis ke customer — saat pendaftaran
+            diterima, saat bukti pembayaran masuk, dan saat pembayaran dinyatakan lunas. Saklar di
+            setiap template menentukan apakah pesannya benar-benar dikirim. Template dipakai bersama
+            dengan admin, jadi pelanggan dari semua CS mendapat pesan yang sama.
+          </p>
+          {templateEditor}
         </div>
 
         <WaSettingsCard isAdmin={false} />
@@ -1093,34 +1848,7 @@ export const Notifications: React.FC = () => {
           <FileText size={16} color={activeTab === 'templates' ? '#FFD93D' : '#4A90D9'} />
           <span>Editor Template ({templates.length > 0 ? templates.length : 6})</span>
         </button>
-
-        <button
-          type="button"
-          className="notif-tab-btn"
-          onClick={() => setActiveTab('cs')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '10px 10px 0 0',
-            border: 'none',
-            backgroundColor: activeTab === 'cs' ? '#4A90D9' : 'transparent',
-            color: activeTab === 'cs' ? '#FFFFFF' : '#64748B',
-            fontFamily: "'Baloo 2', cursive",
-            fontSize: '1.05rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          <MessageSquare size={16} color={activeTab === 'cs' ? '#FFD93D' : '#25D366'} />
-          <span>Notifikasi per CS</span>
-        </button>
       </div>
-
-      {/* TAB 4: Setelan notifikasi WhatsApp per CS (token Fonnte + template) */}
-      {activeTab === 'cs' && <WaSettingsCard isAdmin={true} />}
 
       {/* TAB 1: Kirim WA Manual */}
       {activeTab === 'manual' && (
@@ -1718,580 +2446,9 @@ export const Notifications: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: Editor Template Pesan WA */}
-      {activeTab === 'templates' && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
-            gap: '1.5rem',
-          }}
-        >
-          {/* Left Form: Template List & Editor */}
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1.25rem',
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '8px' }}>
-                <h3 style={{ fontFamily: "'Baloo 2', cursive", fontSize: '1.25rem', fontWeight: 700, color: '#1E293B', margin: 0 }}>
-                  Editor Template WhatsApp
-                </h3>
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
-                    fontSize: '0.725rem',
-                    fontWeight: 700,
-                  }}
-                >
-                  Cloudflare D1 Synced
-                </span>
-              </div>
-              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
-                Pilih template untuk mengubah teks pesan otomatis, format WhatsApp (*bold*, _italic_), dan tag dinamis.
-              </p>
-            </div>
-
-            {/* Template Selector Grid / Pills */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.5rem' }}>
-                Pilih Template Pesan:
-              </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '8px',
-                }}
-              >
-                {Object.keys(DEFAULT_TEMPLATES_MAP).map((tmplKey) => {
-                  const def = DEFAULT_TEMPLATES_MAP[tmplKey];
-                  const tmplData = templates.find((t) => t.id === tmplKey);
-                  const isSelected = selectedTemplateId === tmplKey;
-                  const displayName = tmplData?.name || def.name;
-
-                  return (
-                    <button
-                      key={tmplKey}
-                      type="button"
-                      onClick={() => handleSelectTemplate(tmplKey)}
-                      style={{
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: '10px',
-                        border: isSelected ? '2px solid #4A90D9' : '1px solid #CBD5E1',
-                        backgroundColor: isSelected ? '#EFF6FF' : '#F8FAFC',
-                        color: isSelected ? '#1E40AF' : '#334155',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isSelected ? '0 2px 8px rgba(74, 144, 217, 0.2)' : 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{def.badge}</span>
-                        {isSelected && <Check size={14} color="#4A90D9" />}
-                      </div>
-                      <span style={{ fontSize: '0.725rem', color: isSelected ? '#3B82F6' : '#64748B', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {displayName}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Template Information Card */}
-            {selectedTemplateMeta && (
-              <div
-                style={{
-                  backgroundColor: '#F0F9FF',
-                  borderRadius: '12px',
-                  padding: '0.85rem 1rem',
-                  border: '1px solid #BAE6FD',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Info size={15} color="#0284C7" />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369A1' }}>
-                    {selectedTemplateMeta.name} (Slug: <code>{selectedTemplateId}</code>)
-                  </span>
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#0C4A6E', margin: 0, lineHeight: 1.4 }}>
-                  {selectedTemplateMeta.description}
-                </p>
-                <div>
-                  <div style={{ fontSize: '0.725rem', fontWeight: 700, color: '#0369A1', marginBottom: '4px' }}>
-                    Tag Placeholder Template Ini (Klik untuk Menyisipkan):
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                    {selectedTemplateMeta.placeholders.map((ph) => (
-                      <button
-                        key={ph}
-                        type="button"
-                        className="btn-touch-sm"
-                        onClick={() => handleInsertPlaceholder(ph)}
-                        title={`Klik untuk menyisipkan ${ph}`}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: '1px dashed #0284C7',
-                          backgroundColor: '#FFFFFF',
-                          color: '#0369A1',
-                          fontSize: '0.725rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#E0F2FE';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        }}
-                      >
-                        + {ph}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Collapsible All Placeholders Reference */}
-                <details style={{ marginTop: '0.35rem' }}>
-                  <summary
-                    style={{
-                      fontSize: '0.725rem',
-                      fontWeight: 700,
-                      color: '#0284C7',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                    }}
-                  >
-                    📚 Lihat Semua Placeholder Sistem yang Tersedia ({ALL_PLACEHOLDERS_CATEGORIES.reduce((acc, c) => acc + c.items.length, 0)} tag)
-                  </summary>
-                  <div
-                    style={{
-                      marginTop: '0.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.65rem',
-                      backgroundColor: '#FFFFFF',
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #BAE6FD',
-                    }}
-                  >
-                    {ALL_PLACEHOLDERS_CATEGORIES.map((cat) => (
-                      <div key={cat.category}>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0369A1', marginBottom: '3px' }}>
-                          {cat.category}:
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {cat.items.map((item) => (
-                            <button
-                              key={item.tag}
-                              type="button"
-                              className="btn-touch-sm"
-                              onClick={() => handleInsertPlaceholder(item.tag)}
-                              title={`${item.tag} - ${item.desc}`}
-                              style={{
-                                padding: '6px 10px',
-                                borderRadius: '5px',
-                                border: '1px solid #E0F2FE',
-                                backgroundColor: '#F0F9FF',
-                                color: '#0369A1',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#BAE6FD';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = '#F0F9FF';
-                              }}
-                            >
-                              <code>{item.tag}</code>
-                              <span style={{ fontSize: '0.65rem', color: '#64748B' }}>({item.desc})</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {/* Template Name (Optional Edit) */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
-                Nama / Judul Template:
-              </label>
-              <input
-                type="text"
-                value={editorName}
-                onChange={(e) => setEditorName(e.target.value)}
-                placeholder="Nama template..."
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  borderRadius: '10px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '0.875rem',
-                  outline: 'none',
-                  backgroundColor: '#FFFFFF',
-                }}
-              />
-            </div>
-
-            {/* Formatting & Emoji Toolbar */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
-                  Toolbar Format WhatsApp:
-                </span>
-                <span style={{ fontSize: '0.725rem', color: '#94A3B8' }}>
-                  Gunakan untuk mempercantik pesan
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  className="btn-touch-sm"
-                  onClick={() => handleInsertFormat('*', '*')}
-                  title="Format Tebal (*bold*)"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#F8FAFC',
-                    color: '#1E293B',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                  }}
-                >
-                  *B* Tebal
-                </button>
-                <button
-                  type="button"
-                  className="btn-touch-sm"
-                  onClick={() => handleInsertFormat('_', '_')}
-                  title="Format Miring (_italic_)"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#F8FAFC',
-                    color: '#1E293B',
-                    fontSize: '0.75rem',
-                    fontStyle: 'italic',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  _I_ Miring
-                </button>
-                <button
-                  type="button"
-                  className="btn-touch-sm"
-                  onClick={() => handleInsertFormat('~', '~')}
-                  title="Format Coret (~strikethrough~)"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#F8FAFC',
-                    color: '#1E293B',
-                    fontSize: '0.75rem',
-                    textDecoration: 'line-through',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ~S~ Coret
-                </button>
-
-                <div style={{ height: '16px', width: '1px', backgroundColor: '#CBD5E1', margin: '0 2px' }} />
-
-                {['👋', '🎉', '🚀', '📚', '⏰', '💳', '💰', '✅', '📞', '🌐', '🧮', '💪', '🔔'].map((em) => (
-                  <button
-                    key={em}
-                    type="button"
-                    className="btn-touch-sm"
-                    onClick={() => handleInsertEmoji(em)}
-                    title={`Sisipkan emoji ${em}`}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minWidth: '34px',
-                      minHeight: '34px',
-                      padding: '4px 6px',
-                      borderRadius: '6px',
-                      border: '1px solid #E2E8F0',
-                      backgroundColor: '#FFFFFF',
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {em}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Template Content Textarea */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                <label style={{ fontSize: '0.825rem', fontWeight: 700, color: '#334155' }}>
-                  Isi Konten Template: <span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    color: editorContent.length > 2000 ? '#EF4444' : '#64748B',
-                    fontWeight: editorContent.length > 2000 ? 800 : 500,
-                  }}
-                >
-                  {editorContent.length} / 2000 karakter
-                </span>
-              </div>
-              <textarea
-                ref={editorTextareaRef}
-                rows={10}
-                placeholder="Tuliskan isi template pesan WhatsApp..."
-                value={editorContent}
-                onChange={(e) => setEditorContent(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: '10px',
-                  border: editorContent.length > 2000 ? '1.5px solid #EF4444' : '1px solid #CBD5E1',
-                  fontSize: '0.875rem',
-                  outline: 'none',
-                  resize: 'vertical',
-                  backgroundColor: '#FFFFFF',
-                  lineHeight: 1.5,
-                  fontFamily: 'inherit',
-                }}
-              />
-            </div>
-
-            {/* Action Buttons: Reset & Save */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={handleResetTemplate}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '0.65rem 1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #CBD5E1',
-                  backgroundColor: '#F8FAFC',
-                  color: '#475569',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F1F5F9';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F8FAFC';
-                }}
-              >
-                <RotateCcw size={15} />
-                <span>Reset ke Default</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveTemplate}
-                disabled={isSavingTemplate || editorContent.length > 2000}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '0.75rem 1.6rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  backgroundColor: '#6BCB77',
-                  color: '#FFFFFF',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  cursor: isSavingTemplate || editorContent.length > 2000 ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 4px 14px rgba(107, 203, 119, 0.4)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {isSavingTemplate ? (
-                  <RefreshCw size={16} className="animate-spin" />
-                ) : (
-                  <Save size={16} />
-                )}
-                <span>{isSavingTemplate ? 'Menyimpan ke DB...' : 'Simpan Perubahan Template'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Live WhatsApp Chat Simulator Preview */}
-          <div
-            style={{
-              backgroundColor: '#ECE5DD',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              border: '1px solid #D1D7DB',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              minHeight: '450px',
-            }}
-          >
-            {/* WhatsApp App Header Mock */}
-            <div
-              style={{
-                backgroundColor: '#075E54',
-                color: '#FFFFFF',
-                borderRadius: '10px 10px 0 0',
-                padding: '0.75rem 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                margin: '-1.5rem -1.5rem 1rem -1.5rem',
-              }}
-            >
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  backgroundColor: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.1rem',
-                }}
-              >
-                🧮
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>Djuniors Learning Center</div>
-                <div style={{ fontSize: '0.7rem', color: '#A7F3D0' }}>
-                  Simulasi WhatsApp Gateway (Live Preview)
-                </div>
-              </div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#A7F3D0' }}>Official</div>
-            </div>
-
-            {/* Chat Messages Body */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Date Stamp */}
-              <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
-                <span
-                  style={{
-                    backgroundColor: 'rgba(225, 245, 254, 0.92)',
-                    padding: '3px 10px',
-                    borderRadius: '8px',
-                    fontSize: '0.7rem',
-                    color: '#54656F',
-                    fontWeight: 600,
-                  }}
-                >
-                  PREVIEW TEMPLATE: {selectedTemplateMeta?.name || selectedTemplateId}
-                </span>
-              </div>
-
-              {/* Message Bubble */}
-              <div
-                style={{
-                  alignSelf: 'flex-end',
-                  maxWidth: '90%',
-                  backgroundColor: '#DCF8C6',
-                  borderRadius: '10px 0px 10px 10px',
-                  padding: '0.85rem 1.1rem',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                  position: 'relative',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '0.875rem',
-                    color: '#111B21',
-                    lineHeight: 1.5,
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {renderFormattedWhatsAppText(editorContent)}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    gap: '4px',
-                    marginTop: '6px',
-                  }}
-                >
-                  <span style={{ fontSize: '0.65rem', color: '#667781' }}>10:30</span>
-                  <CheckCircle2 size={12} color="#53BDEB" />
-                </div>
-              </div>
-            </div>
-
-            {/* Live Sample Notice footer */}
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '0.6rem 0.75rem',
-                fontSize: '0.725rem',
-                color: '#475569',
-                backgroundColor: 'rgba(255, 255, 255, 0.75)',
-                borderRadius: '10px',
-                marginTop: '1rem',
-                lineHeight: 1.4,
-              }}
-            >
-              💡 <strong>Simulasi Otomatis:</strong> Tag seperti <code>{'{nomor_pendaftaran}'}</code>, <code>{'{tagihan_akhir}'}</code>, <code>{'{metode_pembayaran}'}</code>, <code>{'{link_pembayaran}'}</code> digantikan dengan nilai data transaksi asli saat dikirim via WhatsApp Fonnte API.
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TAB 3: Editor Template Pesan WA — dipakai admin DAN CS */}
+      {/* Editor template — dipakai admin DAN CS (deklarasi di atas). */}
+      {activeTab === 'templates' && templateEditor}
 
       {/* SECTION: Log Notifikasi Terkirim */}
       <div
