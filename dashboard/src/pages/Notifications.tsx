@@ -326,6 +326,9 @@ export const Notifications: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
   const [waProvider, setWaProvider] = useState<string>('Fonnte');
+  // Alasan dari server (mis. "kuota habis" vs "token ditolak") — beda
+  // penanganan, jadi UI jangan hanya bilang "terputus".
+  const [waMessage, setWaMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isCheckingWa, setIsCheckingWa] = useState<boolean>(false);
@@ -401,8 +404,10 @@ export const Notifications: React.FC = () => {
       if (waRes.status === 'fulfilled') {
         setWaConnected(waRes.value.connected);
         setWaProvider(waRes.value.provider || 'Fonnte');
+        setWaMessage(waRes.value.message || '');
       } else {
         setWaConnected(false);
+        setWaMessage('Gagal memeriksa status dari server.');
       }
 
       if (tmplsRes.status === 'fulfilled' && Array.isArray(tmplsRes.value)) {
@@ -436,13 +441,15 @@ export const Notifications: React.FC = () => {
       const res = await notificationsApi.getWaStatus();
       setWaConnected(res.connected);
       setWaProvider(res.provider || 'Fonnte');
+      setWaMessage(res.message || '');
       if (res.connected) {
         showToast('WhatsApp Gateway Fonnte terhubung dengan baik!', 'success');
       } else {
-        showToast('Gateway WhatsApp terputus. Pastikan token Fonnte aktif.', 'error');
+        showToast(res.message || 'Gateway WhatsApp terputus. Pastikan token Fonnte aktif.', 'error');
       }
     } catch {
       setWaConnected(false);
+      setWaMessage('Gagal menghubungi server Fonnte.');
       showToast('Gagal menghubungi server Fonnte.', 'error');
     } finally {
       setIsCheckingWa(false);
@@ -973,9 +980,10 @@ export const Notifications: React.FC = () => {
               )}
             </div>
             <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              {waConnected
-                ? 'Device siap mengirim pesan broadcast dan notifikasi otomatis ke nomor wali murid.'
-                : 'Server gateway belum tersambung. Pastikan token Fonnte pada konfigurasi sistem aktif.'}
+              {waMessage ||
+                (waConnected
+                  ? 'Device siap mengirim pesan broadcast dan notifikasi otomatis ke nomor wali murid.'
+                  : 'Server gateway belum tersambung. Pastikan token Fonnte pada konfigurasi sistem aktif.')}
             </p>
           </div>
         </div>

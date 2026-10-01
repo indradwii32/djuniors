@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
-import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, checkFonnteStatus, getFonnteToken } from '../utils/fonnte';
+import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, getFonnteToken } from '../utils/fonnte';
 
 const notifications = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -685,30 +685,76 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
     return c.json({ sent, failed, total: users.results.length });
 });
 
-// Check Fonnte status.
+// Check status gateway WhatsApp.
 //
-// Menyediakan tiga hal sekaligus karena ketiganya sering disalahpahami:
-//   * token_terpasang — apakah ada token sama sekali (D1 settings / env var)
-//   * connected — apakah token itu benar-benar diterima Fonnte (/status)
-//   * message — alasan saat belum terhubung, supaya UI bisa menjelaskan
-//     "token belum diisi" berbeda dari "token salah / kuota habis".
+// Fonnte tidak punya endpoint "cek koneksi" yang jujur lagi: `/status`
+// sudah deprecated dan selalu membalas status:false. Yang dipakai adalah
+// `/device` (lihat utils/fonnte.ts), yang memberi device, status koneksi,
+// kuota, dan masa berlaku.
 //
-// Token tidak pernah dikembalikan utuh hanya untuk keperluan UI.
+// Rincian ini diteruskan ke UI supaya "offline" bisa dibedakan dari
+// "token salah" — dua masalah yang perbaikannya berbeda.
 notifications.get('/wa/status', async (c) => {
     const token = (await getFonnteToken(c.env)).trim();
     const tokenTerpasang = token.length > 0;
-    const connected = tokenTerpasang ? await checkFonnteStatus({ token }) : false;
 
-    return c.json({
-        connected,
-        provider: 'Fonnte',
-        token_set: tokenTerpasang,
-        message: connected
-            ? 'Terhubung'
-            : (!tokenTerpasang
-                ? 'Token Fonnte belum diisi (Pengaturan → WhatsApp Gateway)'
-                : 'Token ditolak Fonnte — cek token atau kuota device'),
-    });
+    if (!tokenTerpasang) {
+        return c.json({
+            connected: false,
+            provider: 'Fonnte',
+            token_set: false,
+            message: 'Token Fonnte belum diisi (Pengaturan → WhatsApp Gateway)',
+        });
+    }
+
+    try {
+        const response = await fetch('https://api.fonnte.com/device', {
+            method: 'POST',
+            headers: {
+                'Authorization': token,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(10_000),
+        });
+        const data = await response.json() as any;
+
+        if (data.status !== true) {
+            return c.json({
+                connected: false,
+                provider: 'Fonnte',
+                token_set: true,
+                message: data.reason
+                    ? `Fonnte menolak token: ${data.reason}`
+                    : 'Token ditolak Fonnte — cek token di dashboard.fonnte.com',
+            });
+        }
+
+        const deviceConnect = data.device_status === 'connect';
+        const quota = Number(data.quota) || 0;
+        return c.json({
+            connected: deviceConnect,
+            provider: 'Fonnte',
+            token_set: true,
+            device: data.device || null,
+            device_name: data.name || null,
+            device_status: data.device_status || null,
+            quota,
+            expired: data.expired || null,
+            message: !deviceConnect
+                ? 'Device Fonnte tidak terhubung — hubungkan WhatsApp di dashboard.fonnte.com'
+                : (quota <= 0
+                    ? 'Device terhubung tapi kuota habis'
+                    : `Terhubung via ${data.device || 'device Fonnte'}`),
+        });
+    } catch {
+        return c.json({
+            connected: false,
+            provider: 'Fonnte',
+            token_set: true,
+            message: 'Tidak bisa menghubungi Fonnte — cek koneksi internet server',
+        });
+    }
 });
 
 // Get current Fonnte token (masked) — admin only

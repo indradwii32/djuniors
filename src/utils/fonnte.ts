@@ -143,28 +143,45 @@ export async function sendBulkWAFonnte(
 }
 
 /**
- * Check Fonnte API connection status
+ * Check Fonnte API connection status.
+ *
+ * PENTING: endpoint Fonnte `/status` sudah DEPRECATED. Fonnte membalas
+ * `{status:false, reason:"this API is deprecated, use webhook update message
+ * status instead"}` untuk token yang sepenuhnya valid — jadi memakai /status
+ * membuat dashboard selalu menampilkan "offline" padahal token baik.
+ *
+ * `/device` adalah pemeriksa koneksi yang benar: mengembalikan info device,
+ * status koneksi, kuota, dan masa berlaku. Status "connect" + kuota > 0 =
+ * gateway benar-benar bisa dipakai.
  */
 export async function checkFonnteStatus(config: FonnteConfig): Promise<boolean> {
     const baseUrl = config.baseUrl || 'https://api.fonnte.com';
 
-    // Token kosong = pasti tidak terhubung. Tanpa cek ini, Fonnte dipanggil
-    // dengan header Authorization kosong dan endpoint /status membalas
-    // {status:false} — yang tidak bisa dibedakan dari "token salah".
+    // Token kosong = pasti tidak terhubung. Tanpa cek ini, Authorization
+    // kosong dikirim ke Fonnte dan hasilnya tidak bisa dibedakan dari
+    // "token salah".
     if (!config.token || config.token.trim() === '') {
         return false;
     }
 
     try {
-        const response = await fetch(`${baseUrl}/status`, {
+        const response = await fetch(`${baseUrl}/device`, {
+            method: 'POST',
             headers: {
-                'Authorization': config.token
+                'Authorization': config.token,
+                'Content-Type': 'application/json',
             },
-            signal: AbortSignal.timeout(8_000)
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(10_000)
         });
 
         const data = await response.json() as any;
-        return data.status === true;
+        // `status:true` berarti token diterima. `device_status` cuma
+        // 'connect' kalau WhatsApp-nya benar-benar terhubung.
+        if (data.status === true) {
+            return data.device_status === 'connect' || !data.device_status;
+        }
+        return false;
     } catch {
         return false;
     }

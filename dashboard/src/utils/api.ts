@@ -1035,6 +1035,18 @@ export const formsApi = {
 };
 
 // Notifications Endpoints
+/** Status gateway WhatsApp dari /api/notifications/wa/status. */
+export interface WaStatus {
+  connected: boolean;
+  provider: string;
+  token_set: boolean;
+  message?: string;
+  device?: string | null;
+  device_name?: string | null;
+  device_status?: string | null;
+  quota?: number;
+  expired?: string | null;
+}
 export const notificationsApi = {
   getAll: async (): Promise<NotificationItem[]> => {
     return apiRequest<NotificationItem[]>('/notifications');
@@ -1057,8 +1069,8 @@ export const notificationsApi = {
       }
     );
   },
-  getWaStatus: async (): Promise<{ connected: boolean; provider: string }> => {
-    return apiRequest<{ connected: boolean; provider: string }>('/notifications/wa/status');
+  getWaStatus: async (): Promise<WaStatus> => {
+    return apiRequest<WaStatus>('/notifications/wa/status');
   },
   sendBulkPromo: async (
     promoId: string,
