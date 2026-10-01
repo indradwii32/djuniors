@@ -111,6 +111,16 @@ forms.post('/submit', async (c) => {
         return c.json({ error: 'Missing required fields' }, 400);
     }
 
+    // Cek dulu sebelum insert. Tanpa ini form_id ngawur menabrak foreign key
+    // dan keluar 500 Internal Server Error — padahal masalahnya cuma referensi
+    // yang tidak ada, dan pengunjung form tidak bisa apa-apa dengan 500.
+    const form = await c.env.DB.prepare('SELECT id FROM custom_forms WHERE id = ?')
+        .bind(form_id)
+        .first();
+    if (!form) {
+        return c.json({ error: 'Form not found', message: 'Formulir tidak ditemukan' }, 404);
+    }
+
     const id = crypto.randomUUID();
     await c.env.DB.prepare(`
         INSERT INTO form_submissions (id, form_id, student_id, data)

@@ -432,7 +432,7 @@ export const Notifications: React.FC = () => {
 
   // Template Editor States
   const [templates, setTemplates] = useState<WATemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('welcome');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('enrollment_confirmed');
   const [editorContent, setEditorContent] = useState<string>('');
   const [editorName, setEditorName] = useState<string>('');
   const [isSavingTemplate, setIsSavingTemplate] = useState<boolean>(false);
@@ -479,7 +479,7 @@ export const Notifications: React.FC = () => {
 
       if (tmplsRes.status === 'fulfilled' && Array.isArray(tmplsRes.value)) {
         setTemplates(tmplsRes.value);
-        const currentSelectedId = selectedTemplateId || 'welcome';
+        const currentSelectedId = selectedTemplateId || 'enrollment_confirmed';
         const found = tmplsRes.value.find((t) => t.id === currentSelectedId);
         if (found) {
           setEditorContent(found.content);
@@ -894,7 +894,7 @@ export const Notifications: React.FC = () => {
   });
 
   const selectedPromoObj = promos.find((p) => p.id === selectedPromoId);
-  const selectedTemplateMeta = DEFAULT_TEMPLATES_MAP[selectedTemplateId] || DEFAULT_TEMPLATES_MAP['welcome'];
+  const selectedTemplateMeta = DEFAULT_TEMPLATES_MAP[selectedTemplateId] || DEFAULT_TEMPLATES_MAP['enrollment_confirmed'];
   // Kolom is_enabled belum ada di D1 lama; default = 1 supaya tampilan tidak
   // salah aktif sebelum migrasi dijalankan.
   const isSelectedTemplateEnabled = (() => {
@@ -956,7 +956,7 @@ export const Notifications: React.FC = () => {
         {/* Template Selector Grid / Pills */}
         <div>
           <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.5rem' }}>
-            Pilih Template Pesan:
+            Pilih Notifikasi (4):
           </label>
           <div
             style={{
@@ -965,7 +965,11 @@ export const Notifications: React.FC = () => {
               gap: '8px',
             }}
           >
-            {Object.keys(DEFAULT_TEMPLATES_MAP).map((tmplKey) => {
+            {/* Hanya template yang benar-benar dikirim otomatis. Template
+                manual (welcome, promo, dst) ada di tab Kirim Manual — tidak
+                masuk ke sini supaya daftarnya tidak terlihat "8" padahal
+                hanya 4 yang berarti. */}
+            {Object.keys(AUTO_NOTIFY_EVENTS).map((tmplKey) => {
               const def = DEFAULT_TEMPLATES_MAP[tmplKey];
               const tmplData = templates.find((t) => t.id === tmplKey);
               const isSelected = selectedTemplateId === tmplKey;
@@ -2150,7 +2154,7 @@ export const Notifications: React.FC = () => {
           }}
         >
           <FileText size={16} color={activeTab === 'templates' ? '#FFD93D' : '#4A90D9'} />
-          <span>Editor Template ({templates.length > 0 ? templates.length : 6})</span>
+          <span>Editor Template (4 notifikasi)</span>
         </button>
       </div>
 

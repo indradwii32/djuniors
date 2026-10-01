@@ -164,6 +164,31 @@ CREATE TABLE IF NOT EXISTS cs_wa_settings (
     updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Custom Forms — definisi daftar field + jawaban yang disubmit publik.
+-- Route /api/forms sudah ada sebelum tabel ini pernah dibuat di schema mana
+-- pun (migrasi 009); dibiarkan, setiap request form akan 500.
+CREATE TABLE IF NOT EXISTS custom_forms (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    description TEXT,
+    -- JSON array field: {name, label, type, required, ...}
+    fields      TEXT NOT NULL DEFAULT '[]',
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_custom_forms_active ON custom_forms(is_active);
+
+CREATE TABLE IF NOT EXISTS form_submissions (
+    id         TEXT PRIMARY KEY,
+    form_id    TEXT NOT NULL REFERENCES custom_forms(id) ON DELETE CASCADE,
+    student_id TEXT,
+    data       TEXT NOT NULL DEFAULT '{}',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_form_id ON form_submissions(form_id);
+CREATE INDEX IF NOT EXISTS idx_form_submissions_created_at ON form_submissions(created_at DESC);
+
 -- Levels table
 CREATE TABLE IF NOT EXISTS levels (
     id TEXT PRIMARY KEY,
