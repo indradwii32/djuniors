@@ -964,14 +964,12 @@ class DjuniorsRegistration {
 
         const parentName = document.getElementById('parent-name')?.value.trim();
         const parentPhone = document.getElementById('parent-phone')?.value.trim();
-        const parentEmail = document.getElementById('parent-email')?.value.trim() || null;
         const parentCity = document.getElementById('parent-city')?.value.trim();
         const notes = document.getElementById('reg-notes')?.value.trim() || null;
 
         const payload = {
             parent_name: parentName,
             parent_phone: parentPhone,
-            parent_email: parentEmail,
             parent_city: parentCity,
             class_id: this.selectedClass.id,
             schedule_slot: this.selectedSlot || 'Jadwal Fleksibel',

@@ -61,7 +61,7 @@ paymentTracking.get('/', adminAuthMiddleware, async (c) => {
     const whereSql = whereParts.join(' AND ');
 
     const listSql = `
-        SELECT pt.*, r.parent_name, r.parent_email, r.class_id, r.children,
+        SELECT pt.*, r.parent_name, r.class_id, r.children,
                r.ref_code, r.status AS registration_status, r.payment_status AS registration_payment_status,
                r.bank_name, r.bank_account_number, c.name AS class_name
         FROM payment_tracking pt
@@ -348,13 +348,26 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
     if (registration?.id) {
         const regPaymentStatus = status === 'confirmed' ? 'paid' : 'rejected';
 
+        // paid_at hanya diisi saat pembayaran BENAR-BENAR dikonfirmasi (lunas),
+        // tidak saat ditolak. Kolom ini menjadi sumber angka "closing" per hari
+        // di menu Laporan CS (dihitung dari tanggal pembayaran, bukan tanggal
+        // pendaftaran). verified_by dicatat untuk jejak siapa yang memverifikasi.
         await c.env.DB.prepare(`
             UPDATE registrations SET
                 payment_status = ?,
                 status = CASE WHEN ? = 'confirmed' THEN 'confirmed' ELSE status END,
+                paid_at = CASE WHEN ? = 'confirmed' THEN datetime('now') ELSE paid_at END,
+                verified_by = CASE WHEN ? = 'confirmed' THEN ? ELSE verified_by END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        `).bind(regPaymentStatus, status, registration.id).run();
+        `).bind(
+            regPaymentStatus,
+            status,
+            status,
+            status,
+            confirmedBy,
+            registration.id
+        ).run();
     }
 
     // Confirmation changes what the public tracking page shows — invalidate.

@@ -29,6 +29,7 @@ import formRoutes from './routes/forms';
 import adminAccountRoutes from './routes/admin-accounts';
 import rotatorRoutes from './routes/cs-rotator';
 import csRoutes from './routes/cs';
+import csReportRoutes from './routes/cs-reports';
 import { verifyJWT, getJwtSecret } from './utils/jwt';
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -163,6 +164,7 @@ app.route('/api/admin/usage', adminUsageRoutes);
 app.route('/api/dashboard/snapshots', dashboardSnapshotsRoutes);
 app.route('/api/admin/accounts', adminAccountRoutes);
 app.route('/api/cs', csRoutes);
+app.route('/api/cs', csReportRoutes);
 
 // Legacy routes fallback
 app.route('/api/enrollments', enrollmentRoutes);

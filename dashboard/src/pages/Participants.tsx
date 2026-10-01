@@ -36,7 +36,6 @@ export interface ParticipantRow {
   childNotes?: string;
   parentName: string;
   parentPhone: string;
-  parentEmail?: string;
   parentCity?: string;
   classId?: string;
   className: string;
@@ -126,7 +125,6 @@ export const Participants: React.FC = () => {
               childNotes: child.notes || reg.notes,
               parentName: reg.parent_name || '-',
               parentPhone: reg.parent_phone || '-',
-              parentEmail: reg.parent_email || undefined,
               parentCity: reg.parent_city || undefined,
               classId: reg.class_id,
               className: reg.class_name || 'Kelas Matematika',
@@ -155,7 +153,6 @@ export const Participants: React.FC = () => {
               childNotes: std.notes,
               parentName: std.school ? `Sekolah: ${std.school}` : 'Wali Murid',
               parentPhone: '-',
-              parentEmail: undefined,
               parentCity: undefined,
               className: 'Kelas Matematika',
               registrationNumber: `STD-${std.id.slice(-6).toUpperCase()}`,
@@ -307,7 +304,6 @@ export const Participants: React.FC = () => {
       p.childName.toLowerCase().includes(q) ||
       p.parentName.toLowerCase().includes(q) ||
       p.parentPhone.toLowerCase().includes(q) ||
-      (p.parentEmail && p.parentEmail.toLowerCase().includes(q)) ||
       (p.parentCity && p.parentCity.toLowerCase().includes(q)) ||
       p.className.toLowerCase().includes(q) ||
       p.registrationNumber.toLowerCase().includes(q);
@@ -685,7 +681,7 @@ export const Participants: React.FC = () => {
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>UMUR / KELAS</th>
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>NAMA ORANG TUA</th>
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>WHATSAPP</th>
-                <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>EMAIL & KOTA</th>
+                <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>KOTA</th>
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>KELAS TERDAFTAR</th>
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569' }}>STATUS</th>
                 <th style={{ padding: '0.9rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, color: '#475569', textAlign: 'right' }}>AKSI</th>
@@ -817,16 +813,15 @@ export const Participants: React.FC = () => {
                       )}
                     </td>
 
-                    {/* EMAIL & KOTA */}
+                    {/* KOTA */}
                     <td style={{ padding: '1rem 1.1rem' }}>
-                      <div style={{ fontSize: '0.825rem', color: '#334155' }}>
-                        {row.parentEmail || '-'}
-                      </div>
-                      {row.parentCity && (
-                        <div style={{ fontSize: '0.72rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                          <MapPin size={11} color="#94A3B8" />
+                      {row.parentCity ? (
+                        <div style={{ fontSize: '0.825rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <MapPin size={12} color="#94A3B8" />
                           <span>{row.parentCity}</span>
                         </div>
+                      ) : (
+                        <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>-</span>
                       )}
                     </td>
 
@@ -1131,13 +1126,6 @@ export const Participants: React.FC = () => {
                           <span>Chat</span>
                         </a>
                       )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Email</div>
-                    <div style={{ fontSize: '0.9rem', color: '#334155', marginTop: '2px' }}>
-                      {detailParticipant.parentEmail || '-'}
                     </div>
                   </div>
 

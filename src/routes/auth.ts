@@ -6,11 +6,33 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { createJWT, hashPassword, verifyPassword, getJwtSecret } from '../utils/jwt';
 import { authMiddleware } from '../middleware/auth';
+import { rateLimit } from '../utils/rate-limit';
 
 const auth = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+// Rate limit endpoint login. Tanpa ini kredensial admin bisa di-brute-force
+// tanpa hambatan dari satu IP. Admin: 8x/15 menit per IP. User: 10x/15 menit.
+const adminLoginLimiter = rateLimit({
+    name: 'auth-admin-login',
+    limit: 8,
+    windowSeconds: 900,
+    message: 'Terlalu banyak percobaan login. Tunggu 15 menit lalu coba lagi.',
+});
+const userLoginLimiter = rateLimit({
+    name: 'auth-user-login',
+    limit: 10,
+    windowSeconds: 900,
+    message: 'Terlalu banyak percobaan login. Tunggu 15 menit lalu coba lagi.',
+});
+const registerLimiter = rateLimit({
+    name: 'auth-register',
+    limit: 5,
+    windowSeconds: 3600,
+    message: 'Terlalu banyak pembuatan akun dari jaringan ini. Silakan coba nanti.',
+});
+
 // Register (Parent)
-auth.post('/register', async (c) => {
+auth.post('/register', registerLimiter, async (c) => {
     const body = await c.req.json();
     const { email, password, name, phone, child_name, birth_date, grade, school } = body;
 
@@ -80,7 +102,7 @@ auth.post('/register', async (c) => {
 });
 
 // Login (Parent)
-auth.post('/login', async (c) => {
+auth.post('/login', userLoginLimiter, async (c) => {
     const { email, password } = await c.req.json();
 
     if (!email || !password) {
@@ -128,7 +150,7 @@ auth.post('/login', async (c) => {
 });
 
 // Admin Login
-auth.post('/admin/login', async (c) => {
+auth.post('/admin/login', adminLoginLimiter, async (c) => {
     const { username, password } = await c.req.json();
 
     if (!username || !password) {

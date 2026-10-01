@@ -22,6 +22,7 @@ import {
   GraduationCap,
   ClipboardCheck,
   Link2,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -74,6 +75,11 @@ const adminMenuItems: MenuItem[] = [
     icon: Link2,
   },
   {
+    label: 'Laporan CS',
+    path: '/laporan',
+    icon: BarChart3,
+  },
+  {
     label: 'Promo & Diskon',
     path: '/promos',
     icon: Tag,
@@ -121,6 +127,11 @@ const csMenuItems: MenuItem[] = [
     label: 'Link Kelas Saya',
     path: '/cs-links',
     icon: Link2,
+  },
+  {
+    label: 'Laporan',
+    path: '/laporan',
+    icon: BarChart3,
   },
   {
     label: 'Notifikasi WA',

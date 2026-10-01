@@ -78,7 +78,6 @@ registrations.post('/', registerLimiter, async (c) => {
     const {
         parent_name,
         parent_phone,
-        parent_email,
         parent_city,
         class_id,
         schedule_slot,
@@ -278,18 +277,17 @@ registrations.post('/', registerLimiter, async (c) => {
     // Insert registration
     await c.env.DB.prepare(`
         INSERT INTO registrations (
-            id, registration_number, parent_name, parent_phone, parent_email, parent_city,
+            id, registration_number, parent_name, parent_phone, parent_city,
             class_id, schedule_slot, children, total_amount, discount_amount, final_amount,
             promo_code, payment_method, status, payment_status, notes,
             ref_code, bank_account_id, bank_name, bank_account_number, bank_account_name,
             unique_code
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'unpaid', ?, ?, ?, ?, ?, ?, ?)
     `).bind(
         id,
         registrationNumber,
         parentNameStr,
         parentPhoneStr,
-        parent_email ? String(parent_email).trim().slice(0, 160) : null,
         parent_city ? String(parent_city).trim().slice(0, 120) : null,
         class_id,
         scheduleSlotStr,
@@ -381,7 +379,6 @@ registrations.post('/', registerLimiter, async (c) => {
             registration_number: registrationNumber,
             parent_name: parentNameStr,
             parent_phone: parentPhoneStr,
-            parent_email: parent_email ? String(parent_email).trim() : null,
             parent_city: parent_city ? String(parent_city).trim() : null,
             class_id,
             class_name: classInfo.name,
@@ -450,7 +447,6 @@ registrations.get('/', adminAuthMiddleware, async (c) => {
         r.registration_number,
         r.parent_name,
         r.parent_phone,
-        r.parent_email,
         r.parent_city,
         r.class_id,
         r.schedule_slot,
@@ -502,8 +498,8 @@ registrations.get('/', adminAuthMiddleware, async (c) => {
     }
     if (search) {
         const sw = `%${search}%`;
-        whereParts.push('(r.registration_number LIKE ? OR r.parent_name LIKE ? OR r.parent_phone LIKE ? OR r.parent_email LIKE ?)');
-        whereParams.push(sw, sw, sw, sw);
+        whereParts.push('(r.registration_number LIKE ? OR r.parent_name LIKE ? OR r.parent_phone LIKE ?)');
+        whereParams.push(sw, sw, sw);
     }
     const whereSql = whereParts.join(' AND ');
 
@@ -606,11 +602,11 @@ registrations.get('/track/:number', trackLimiter, trackCache, async (c) => {
     });
 
     const formatted = formatRegistration(registration);
-    // Buang kolom internal sebelum dikirim ke halaman publik (email & catatan
-    // admin tidak perlu). `id` tetap dikirim karena dipakai halaman lacak untuk
+    // Buang kolom internal sebelum dikirim ke halaman publik (catatan admin
+    // tidak perlu). `id` tetap dikirim karena dipakai halaman lacak untuk
     // mengunggah bukti bayar — nilainya UUID acak yang hanya didapat setelah
     // verifikasi kepemilikan di atas.
-    const { notes, parent_email, ...safe } = formatted as any;
+    const { notes, ...safe } = formatted as any;
 
     return c.json({
         success: true,

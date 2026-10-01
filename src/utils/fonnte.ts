@@ -5,6 +5,8 @@
 // Fonnte token management — stored in D1 settings table, editable from dashboard Settings.
 // Falls back to env var WA_FONNTE_TOKEN for backward compatibility.
 
+import { D1Database } from '@cloudflare/workers-types';
+
 const FONNTE_TOKEN_KEY = 'fonnte_token';
 
 export async function getFonnteToken(env: { DB: D1Database; WA_FONNTE_TOKEN?: string }): Promise<string> {
@@ -146,6 +148,13 @@ export async function sendBulkWAFonnte(
 export async function checkFonnteStatus(config: FonnteConfig): Promise<boolean> {
     const baseUrl = config.baseUrl || 'https://api.fonnte.com';
 
+    // Token kosong = pasti tidak terhubung. Tanpa cek ini, Fonnte dipanggil
+    // dengan header Authorization kosong dan endpoint /status membalas
+    // {status:false} — yang tidak bisa dibedakan dari "token salah".
+    if (!config.token || config.token.trim() === '') {
+        return false;
+    }
+
     try {
         const response = await fetch(`${baseUrl}/status`, {
             headers: {
@@ -159,6 +168,67 @@ export async function checkFonnteStatus(config: FonnteConfig): Promise<boolean> 
     } catch {
         return false;
     }
+}
+
+/**
+ * Kirim pesan dengan fallback token.
+ *
+ * Token utama (CS) dicoba lebih dulu. Bila gagal — token invalid, kuota
+ * habis, atau Fonnte sedang bermasalah — pesan dicoba ulang memakai token
+ * cadangan (token global/admin). Ini yang membuat "token admin digunakan
+ * sebagai fallback" bekerja: CS tidak kehilangan notifikasi hanya karena
+ * device Fonnte-nya sedang mati.
+ *
+ * `source` menjelaskan token mana yang akhirnya berhasil, supaya UI bisa
+ * memberi tahu CS/admin bahwa pesan dikirim lewat token cadangan.
+ */
+export interface WaSendWithFallbackResult extends FonnteResponse {
+    /** 'primary' = token utama sukses, 'fallback' = token cadangan yang berhasil. */
+    source: 'primary' | 'fallback' | 'none';
+    /** Alasan token utama gagal (untuk log/diagnosa). */
+    primary_error?: string;
+}
+
+export async function sendWaWithFallback(
+    env: { DB: D1Database; WA_FONNTE_TOKEN?: string },
+    primaryToken: string,
+    fallbackToken: string,
+    phone: string,
+    message: string,
+    options?: { typing?: boolean; delay?: number }
+): Promise<WaSendWithFallbackResult> {
+    const primary = (primaryToken || '').trim();
+    const fallback = (fallbackToken || '').trim();
+
+    if (primary) {
+        const result = await sendWAFonnte({ token: primary }, phone, message, options);
+        if (result.status) {
+            return { ...result, source: 'primary' };
+        }
+        // Token utama gagal → coba cadangan, kecuali keduanya token sama
+        // (percobaan kedua sia-sia dan hanya membuang kuota).
+        if (fallback && fallback !== primary) {
+            const retry = await sendWAFonnte({ token: fallback }, phone, message, options);
+            if (retry.status) {
+                return { ...retry, source: 'fallback', primary_error: result.message || 'gagal' };
+            }
+            return {
+                status: false,
+                message: `Token CS gagal (${result.message || 'error'}) dan token cadangan juga gagal (${retry.message || 'error'})`,
+                source: 'none',
+                primary_error: result.message || 'gagal',
+            };
+        }
+        return { ...result, source: 'none', primary_error: result.message || 'gagal' };
+    }
+
+    // Tidak ada token utama → langsung pakai cadangan.
+    if (fallback) {
+        const result = await sendWAFonnte({ token: fallback }, phone, message, options);
+        return { ...result, source: result.status ? 'fallback' : 'none' };
+    }
+
+    return { status: false, message: 'Token Fonnte kosong', source: 'none' };
 }
 
 /**

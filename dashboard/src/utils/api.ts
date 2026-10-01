@@ -108,7 +108,6 @@ export interface RegistrationItem {
   registration_number: string;
   parent_name: string;
   parent_phone: string;
-  parent_email?: string;
   parent_city?: string;
   class_id: string;
   class_name?: string;
@@ -812,6 +811,94 @@ export const csWaApi = {
     const { ref, ...body } = payload;
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest(`/cs/wa-test${qs}`, { method: 'POST', body: JSON.stringify(body) });
+  },
+};
+
+// Laporan harian CS (/api/cs/reports)
+// Hanya chat_masuk yang diinput manual; total_pendaftar & total_closing
+// dihitung server dari tabel registrations.
+export interface CsReportItem {
+  report_date: string;
+  cs_account_id: string;
+  cs_name: string;
+  ref_code: string | null;
+  chat_masuk: number;
+  catatan: string | null;
+  total_pendaftar: number;
+  total_closing: number;
+  persen_closing: number;
+  created_at?: string;
+  updated_at?: string;
+}
+export interface CsReportSummaryRow {
+  report_date: string;
+  chat_masuk: number;
+  total_pendaftar: number;
+  total_closing: number;
+  persen_closing: number;
+}
+export interface CsReportSummaryResponse {
+  success: boolean;
+  scope: string;
+  from: string;
+  to: string;
+  data: CsReportSummaryRow[];
+  totals: {
+    total_pendaftar: number;
+    total_closing: number;
+    total_chat_masuk: number;
+    persen_closing: number;
+  };
+}
+export interface CsReportSaveResponse {
+  success: boolean;
+  report: CsReportItem;
+  message?: string;
+}
+
+export const csReportsApi = {
+  getAll: async (params?: {
+    ref?: string;
+    from?: string;
+    to?: string;
+  }): Promise<{ success: boolean; scope: string; data: CsReportItem[] }> => {
+    const query = new URLSearchParams();
+    if (params?.ref) query.append('ref', params.ref);
+    if (params?.from) query.append('from', params.from);
+    if (params?.to) query.append('to', params.to);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest<{ success: boolean; scope: string; data: CsReportItem[] }>(
+      `/cs/reports${qs}`
+    );
+  },
+  getSummary: async (params?: {
+    ref?: string;
+    from?: string;
+    to?: string;
+  }): Promise<CsReportSummaryResponse> => {
+    const query = new URLSearchParams();
+    if (params?.ref) query.append('ref', params.ref);
+    if (params?.from) query.append('from', params.from);
+    if (params?.to) query.append('to', params.to);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return apiRequest<CsReportSummaryResponse>(`/cs/reports/summary${qs}`);
+  },
+  /**
+   * Simpan laporan satu tanggal (upsert). Ada `ref` untuk admin yang
+   * menulis behalf CS; CS tidak perlu mengirimnya.
+   */
+  save: async (payload: {
+    report_date: string;
+    chat_masuk: number;
+    catatan?: string;
+    ref?: string;
+  }): Promise<CsReportSaveResponse> => {
+    const { ref, ...body } = payload;
+    const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return apiRequest<CsReportSaveResponse>(`/cs/reports${qs}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
   },
 };
 

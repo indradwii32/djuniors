@@ -35,6 +35,7 @@ const CMS = React.lazy(() => import('./pages/CMS'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const VerifikasiPembayaran = React.lazy(() => import('./pages/VerifikasiPembayaran'));
 const CSLinks = React.lazy(() => import('./pages/CSLinks'));
+const Laporan = React.lazy(() => import('./pages/Laporan'));
 
 export const App: React.FC = () => {
   return (
@@ -58,6 +59,10 @@ export const App: React.FC = () => {
             {/* Verifikasi & Link CS: admin semua data, CS di-scope backend */}
             <Route path="verifikasi" element={<VerifikasiPembayaran />} />
             <Route path="cs-links" element={<CSLinks />} />
+            {/* Laporan harian CS: isi chat masuk manual + rekap pendaftar,
+                closing, dan persen closing. CS melihat miliknya sendiri;
+                admin bisa pilih CS atau lihat agregat semua. */}
+            <Route path="laporan" element={<Laporan />} />
             {/* Notifikasi WA: admin mengelola broadcast/template; CS hanya
                 mengelola setelan Fonnte & template notifikasi miliknya. */}
             <Route path="notifications" element={<Notifications />} />

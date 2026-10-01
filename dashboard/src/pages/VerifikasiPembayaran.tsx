@@ -53,7 +53,6 @@ interface TrackingRow {
   created_at: string;
   // join registrasi
   parent_name?: string;
-  parent_email?: string;
   children?: any;
   ref_code?: string | null;
   class_name?: string;

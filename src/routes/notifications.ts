@@ -685,16 +685,29 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
     return c.json({ sent, failed, total: users.results.length });
 });
 
-// Check Fonnte status
+// Check Fonnte status.
+//
+// Menyediakan tiga hal sekaligus karena ketiganya sering disalahpahami:
+//   * token_terpasang — apakah ada token sama sekali (D1 settings / env var)
+//   * connected — apakah token itu benar-benar diterima Fonnte (/status)
+//   * message — alasan saat belum terhubung, supaya UI bisa menjelaskan
+//     "token belum diisi" berbeda dari "token salah / kuota habis".
+//
+// Token tidak pernah dikembalikan utuh hanya untuk keperluan UI.
 notifications.get('/wa/status', async (c) => {
-    const token = await getFonnteToken(c.env);
-    const isConnected = await checkFonnteStatus({
-        token
-    });
+    const token = (await getFonnteToken(c.env)).trim();
+    const tokenTerpasang = token.length > 0;
+    const connected = tokenTerpasang ? await checkFonnteStatus({ token }) : false;
 
     return c.json({
-        connected: isConnected,
-        provider: 'Fonnte'
+        connected,
+        provider: 'Fonnte',
+        token_set: tokenTerpasang,
+        message: connected
+            ? 'Terhubung'
+            : (!tokenTerpasang
+                ? 'Token Fonnte belum diisi (Pengaturan → WhatsApp Gateway)'
+                : 'Token ditolak Fonnte — cek token atau kuota device'),
     });
 });
 

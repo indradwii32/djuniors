@@ -9,7 +9,7 @@
 // Pesan dirender dengan formatWATemplate — placeholder SATU kurung {nama}.
 
 import { D1Database } from '@cloudflare/workers-types';
-import { sendWAFonnte, getFonnteToken } from './fonnte';
+import { sendWAFonnte, getFonnteToken, sendWaWithFallback } from './fonnte';
 import { formatWATemplate } from '../routes/notifications';
 
 export type CsWaEvent = 'registration' | 'payment';
@@ -27,6 +27,8 @@ export interface CsWaSettingsRow {
 export interface CsWaSendResult {
     status: 'sent' | 'failed' | 'skipped' | 'error';
     detail?: string;
+    /** Token mana yang berhasil mengirim (primary = CS, fallback = global/admin). */
+    source?: 'primary' | 'fallback' | 'none';
 }
 
 // Template bawaan — dipakai saat CS belum pernah menyimpan setelan.
@@ -255,8 +257,12 @@ export async function sendCsWaAuto(
                 ? CS_WA_DEFAULT_TPL_REGISTRATION
                 : CS_WA_DEFAULT_TPL_PAYMENT);
 
-        const token = (settings.fonnte_token || '').trim() || (await getFonnteToken(env));
-        if (!token) return { status: 'skipped', detail: 'token_kosong' };
+        // Token CS = utama. Token global/admin = cadangan: dipakai hanya bila
+        // token utama kosong atau Fonnte menolaknya, sehingga notifikasi tetap
+        // terkirim walau device Fonnte CS sedang bermasalah.
+        const csToken = (settings.fonnte_token || '').trim();
+        const globalToken = (await getFonnteToken(env)).trim();
+        if (!csToken && !globalToken) return { status: 'skipped', detail: 'token_kosong' };
 
         const message = renderCsWaMessage(
             template,
@@ -266,10 +272,14 @@ export async function sendCsWaAuto(
         );
         if (!message.trim()) return { status: 'skipped', detail: 'pesan_kosong' };
 
-        const result = await sendWAFonnte({ token }, registration.parent_phone, message, {
-            typing: true,
-            delay: 0,
-        });
+        const result = await sendWaWithFallback(
+            env,
+            csToken,
+            globalToken,
+            registration.parent_phone,
+            message,
+            { typing: true, delay: 0 }
+        );
 
         await logWa(
             env.DB,
@@ -281,7 +291,10 @@ export async function sendCsWaAuto(
 
         return {
             status: result.status ? 'sent' : 'failed',
-            detail: result.message || (result.status ? 'ok' : 'gagal_dari_fonnte'),
+            detail: result.status
+                ? (result.source === 'fallback' ? 'fallback' : (result.message || 'ok'))
+                : (result.message || 'gagal_dari_fonnte'),
+            source: result.source,
         };
     } catch (err) {
         console.error('[cs-wa] auto send error:', err);

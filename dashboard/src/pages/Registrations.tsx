@@ -42,6 +42,13 @@ export const Registrations: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'rejected'>('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'unpaid' | 'pending' | 'paid' | 'rejected'>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
+  // Cakupan data. Default 'in_progress' hanya menampilkan pendaftaran yang
+  // BELUM lunas — dulu tidak ada pilihan lain, sehingga pendaftar yang sudah
+  // lunas/terverifikasi tidak pernah tampil di menu ini sama sekali.
+  //   in_progress = belum confirmed+paid
+  //   completed   = sudah confirmed DAN paid (lunas/terverifikasi)
+  //   all         = semuanya
+  const [scope, setScope] = useState<'in_progress' | 'completed' | 'all'>('in_progress');
 
   // Detail Modal State
   const [detailModalItem, setDetailModalItem] = useState<RegistrationItem | null>(null);
@@ -55,7 +62,9 @@ export const Registrations: React.FC = () => {
       if (isRefresh) setIsRefreshing(true);
       else setIsLoading(true);
 
-      const res = await registrationsApi.getAll({ limit: 100, completed: 'false' });
+      // Server understands completed=true|false; 'all' means send no filter.
+      const completedParam = scope === 'all' ? undefined : scope === 'completed' ? 'true' : 'false';
+      const res = await registrationsApi.getAll({ limit: 100, completed: completedParam });
       // Server returns { data: RegistrationItem[], pagination: {...} }.
       if (res && Array.isArray(res.data)) {
         setRegistrations(res.data);
@@ -71,7 +80,7 @@ export const Registrations: React.FC = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     loadData();
@@ -396,7 +405,6 @@ export const Registrations: React.FC = () => {
       (reg.registration_number && reg.registration_number.toLowerCase().includes(q)) ||
       (reg.parent_name && reg.parent_name.toLowerCase().includes(q)) ||
       (reg.parent_phone && reg.parent_phone.toLowerCase().includes(q)) ||
-      (reg.parent_email && reg.parent_email.toLowerCase().includes(q)) ||
       (reg.class_name && reg.class_name.toLowerCase().includes(q)) ||
       childrenNames.includes(q);
 
@@ -750,6 +758,27 @@ export const Registrations: React.FC = () => {
 
           {/* Filter Dropdowns */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.65rem' }} className="filter-controls-responsive">
+            {/* Cakupan: belum lunas / lunas-terverifikasi / semua */}
+            <select
+              value={scope}
+              onChange={(e) => setScope(e.target.value as 'in_progress' | 'completed' | 'all')}
+              style={{
+                padding: '0.55rem 0.85rem',
+                borderRadius: '10px',
+                border: scope === 'completed' ? '1px solid #6BCB77' : '1px solid #CBD5E1',
+                backgroundColor: scope === 'completed' ? '#ECFDF5' : '#F8FAFC',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: scope === 'completed' ? '#047857' : '#334155',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="in_progress">Data: Belum Lunas</option>
+              <option value="completed">Data: Lunas &amp; Terverifikasi</option>
+              <option value="all">Data: Semua</option>
+            </select>
+
             {/* Status Pendaftaran Filter */}
             <select
               value={statusFilter}
@@ -1229,13 +1258,6 @@ export const Registrations: React.FC = () => {
                         <MessageSquare size={12} />
                         <span>Chat WA</span>
                       </a>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Email</div>
-                    <div style={{ fontSize: '0.9rem', color: '#334155', marginTop: '2px' }}>
-                      {detailModalItem.parent_email || '-'}
                     </div>
                   </div>
 

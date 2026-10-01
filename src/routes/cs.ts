@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
-import { getFonnteToken, sendWAFonnte } from '../utils/fonnte';
+import { getFonnteToken, sendWaWithFallback } from '../utils/fonnte';
 import {
     getCsWaSettings,
     saveCsWaSettings,
@@ -283,19 +283,26 @@ cs.post('/wa-send', adminAuthMiddleware, async (c) => {
     const phone = String(body.phone || '').trim() || String(reg.parent_phone || '');
     if (!phone) return c.json({ error: 'Phone required', message: 'Nomor WhatsApp tidak tersedia' }, 400);
 
-    let token = '';
-    if (csAccount) {
-        token = ((await getCsWaSettings(c.env.DB, csAccount.id))?.fonnte_token || '').trim();
-    }
-    if (!token) token = (await getFonnteToken(c.env)).trim();
-    if (!token) {
+    // Token CS = utama, token global/admin = cadangan.
+    const csToken = csAccount
+        ? ((await getCsWaSettings(c.env.DB, csAccount.id))?.fonnte_token || '').trim()
+        : '';
+    const globalToken = (await getFonnteToken(c.env)).trim();
+    if (!csToken && !globalToken) {
         return c.json({
             error: 'No token',
             message: 'Token Fonnte belum diisi (setelan CS atau gateway global)',
         }, 400);
     }
 
-    const result = await sendWAFonnte({ token }, phone, message, { typing: true, delay: 0 });
+    const result = await sendWaWithFallback(
+        c.env,
+        csToken,
+        globalToken,
+        phone,
+        message,
+        { typing: true, delay: 0 }
+    );
     await logWaManual(
         c.env.DB,
         'cs_manual',
@@ -304,10 +311,20 @@ cs.post('/wa-send', adminAuthMiddleware, async (c) => {
         result.status
     );
 
+    const viaFallback = result.source === 'fallback';
+    // Lihat catatan di /wa-test: source hanya bermakna saat berhasil.
+    const sendSource = !result.status
+        ? 'none'
+        : (viaFallback ? 'fallback_token' : (csToken ? 'cs_token' : 'global_token'));
     return c.json({
         success: result.status,
         status: result.status ? 'sent' : 'failed',
-        message: result.status ? 'Pesan terkirim' : `Gagal mengirim: ${result.message || 'error dari Fonnte'}`,
+        source: sendSource,
+        message: result.status
+            ? (viaFallback
+                ? 'Pesan terkirim lewat token cadangan (token CS bermasalah)'
+                : 'Pesan terkirim')
+            : `Gagal mengirim: ${result.message || 'error dari Fonnte'}`,
     }, result.status ? 200 : 502);
 });
 
@@ -324,20 +341,38 @@ cs.post('/wa-test', adminAuthMiddleware, async (c) => {
     const message = String(body.message || '').trim() ||
         `✅ *Tes Notifikasi WhatsApp D'Juniors*\n\nHalo! Ini adalah pesan tes dari akun CS *${account.name}*.\nJika Anda menerima pesan ini, koneksi Fonnte aktif.`;
 
-    let token = ((await getCsWaSettings(c.env.DB, account.id))?.fonnte_token || '').trim();
-    if (!token) token = (await getFonnteToken(c.env)).trim();
-    if (!token) {
+    const csToken = ((await getCsWaSettings(c.env.DB, account.id))?.fonnte_token || '').trim();
+    const globalToken = (await getFonnteToken(c.env)).trim();
+    if (!csToken && !globalToken) {
         return c.json({ error: 'No token', message: 'Token Fonnte belum diisi (setelan CS atau gateway global)' }, 400);
     }
 
-    const result = await sendWAFonnte({ token }, phone, message, { typing: false, delay: 0 });
+    const result = await sendWaWithFallback(
+        c.env,
+        csToken,
+        globalToken,
+        phone,
+        message,
+        { typing: false, delay: 0 }
+    );
     await logWaManual(c.env.DB, 'cs_test', `Tes → ${account.ref_code || account.id}`, message, result.status);
 
+    const viaFallback = result.source === 'fallback';
+    // source hanya bermakna saat berhasil. Saat semua token gagal, tandai
+    // 'none' — jangan tulis "cs_token" yang menyesatkan karena tidak ada
+    // token pun yang sempat mengirim.
+    const sendSource = !result.status
+        ? 'none'
+        : (viaFallback ? 'fallback_token' : (csToken ? 'cs_token' : 'global_token'));
     return c.json({
         success: result.status,
         status: result.status ? 'sent' : 'failed',
-        source: ((await getCsWaSettings(c.env.DB, account.id))?.fonnte_token || '').trim() ? 'cs_token' : 'global_token',
-        message: result.status ? 'Pesan tes terkirim' : `Gagal: ${result.message || 'error dari Fonnte'}`,
+        source: sendSource,
+        message: result.status
+            ? (viaFallback
+                ? 'Pesan tes terkirim lewat token cadangan (token CS bermasalah)'
+                : 'Pesan tes terkirim')
+            : `Gagal: ${result.message || 'error dari Fonnte'}`,
     }, result.status ? 200 : 502);
 });
 
