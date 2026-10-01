@@ -756,12 +756,17 @@ export const csApi = {
 export interface CsWaSettings {
   fonnte_token_masked: string;
   fonnte_token_set: boolean;
+  /** Nama pengirim untuk {cs_name}; string kosong = memakai nama akun. */
+  wa_display_name: string;
+  wa_display_name_set: boolean;
   is_default: boolean;
   updated_at: string | null;
 }
 export interface CsWaSettingsResponse {
   success: boolean;
   account: { id: string; name: string; ref_code: string | null };
+  /** Nama final yang dipakai di pesan (sudah memperhitungkan fallback). */
+  wa_display_name: string;
   settings: CsWaSettings;
   placeholders: string[];
   /** Label ramah + contoh isi untuk tiap variable (opsional dari server lama). */
@@ -782,7 +787,13 @@ export const csWaApi = {
     ref?: string;
     fonnte_token?: string;
     clear_token?: boolean;
-  }): Promise<{ success: boolean; settings: CsWaSettings }> => {
+    /** Nama pengirim untuk {cs_name}; '' = kembali memakai nama akun. */
+    wa_display_name?: string;
+  }): Promise<{
+    success: boolean;
+    settings: CsWaSettings;
+    wa_display_name: string;
+  }> => {
     const { ref, ...body } = payload;
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest(`/cs/wa-settings${qs}`, { method: 'PUT', body: JSON.stringify(body) });

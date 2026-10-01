@@ -82,6 +82,8 @@ export const CS_WA_FALLBACK_CONTENT: Record<CsWaEvent, string> = {
 export interface CsWaSettingsRow {
     admin_account_id: string;
     fonnte_token: string;
+    /** Nama pengirim untuk {cs_name}; '' = pakai nama akun (lihat migrasi 010). */
+    wa_display_name?: string;
     updated_at?: string;
 }
 
@@ -141,15 +143,43 @@ export function maskToken(token: string): string {
     return '••••••••';
 }
 
-/** Cari akun CS berdasarkan kode ref-nya. */
+/**
+ * Cari akun CS berdasarkan kode ref-nya.
+ * `wa_name` = nama pengirim hasil resolusi (wa_display_name bila diisi, kalau
+ * tidak nama akun) — inilah yang tampil sebagai {cs_name}.
+ */
 export async function findAccountByRef(
     db: D1Database,
     refCode: string
-): Promise<{ id: string; name: string; ref_code: string } | null> {
+): Promise<{ id: string; name: string; ref_code: string; wa_name: string } | null> {
     return db
-        .prepare('SELECT id, name, ref_code FROM admin_accounts WHERE ref_code = ?')
+        .prepare(
+            `SELECT a.id, a.name, a.ref_code,
+                    COALESCE(NULLIF(TRIM(s.wa_display_name), ''), a.name) AS wa_name
+             FROM admin_accounts a
+             LEFT JOIN cs_wa_settings s ON s.admin_account_id = a.id
+             WHERE a.ref_code = ?`
+        )
         .bind(refCode)
         .first();
+}
+
+/**
+ * Nama pengirim final untuk satu akun CS. Prioritas: wa_display_name (punya
+ * CS sendiri, bisa diisi tanpa akses admin) → nama akun (dipakai admin).
+ * Nama akun diambil ulang kalau baris setelannya belum ada.
+ */
+export async function resolveCsDisplayName(
+    db: D1Database,
+    account: { id: string; name: string } | null | undefined
+): Promise<string> {
+    if (!account) return 'Tim';
+    const row = await db
+        .prepare('SELECT wa_display_name FROM cs_wa_settings WHERE admin_account_id = ?')
+        .bind(account.id)
+        .first<{ wa_display_name: string | null }>();
+    const custom = (row?.wa_display_name || '').trim();
+    return custom || account.name || 'Tim';
 }
 
 /** Ambil setelan CS; null bila CS belum pernah menyimpan (→ pakai default). */
@@ -172,6 +202,8 @@ export function serializeCsWaSettings(row: CsWaSettingsRow | null) {
     return {
         fonnte_token_masked: maskToken(storedToken),
         fonnte_token_set: storedToken.length > 0,
+        wa_display_name: (row?.wa_display_name || '').trim(),
+        wa_display_name_set: (row?.wa_display_name || '').trim().length > 0,
         is_default: !row,
         updated_at: row?.updated_at || null,
     };
@@ -188,6 +220,7 @@ export async function saveCsWaSettings(
     patch: {
         fonnte_token?: string;
         clear_token?: boolean;
+        wa_display_name?: string;
     }
 ): Promise<void> {
     const existing = await getCsWaSettings(db, accountId);
@@ -198,15 +231,21 @@ export async function saveCsWaSettings(
         token = patch.fonnte_token.trim();
     }
 
+    // Nama pengirim: hanya ditulis bila dikirim. Tidak dikirim = biarkan yang
+    // ada, supaya PartialUpdate dari form lama tidak diam-diam mengosongkan.
+    let displayName = (existing?.wa_display_name || '').trim();
+    if (typeof patch.wa_display_name === 'string') displayName = patch.wa_display_name.trim();
+
     await db
         .prepare(
-            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, updated_at)
-             VALUES (?, ?, CURRENT_TIMESTAMP)
+            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, wa_display_name, updated_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
              ON CONFLICT(admin_account_id) DO UPDATE SET
                 fonnte_token = excluded.fonnte_token,
+                wa_display_name = excluded.wa_display_name,
                 updated_at = CURRENT_TIMESTAMP`
         )
-        .bind(accountId, token)
+        .bind(accountId, token, displayName)
         .run();
 }
 
@@ -325,7 +364,7 @@ export async function sendCsWaAuto(
             // Pengingat umum tanpa CS. Template menambah sendiri " - D'Juniors",
             // jadi fallback-nya hanya "Tim" — bukan "Tim D'Juniors" yang akan
             // menghasilkan tanda tangan ganda.
-            opts?.csName || account?.name || 'Tim',
+            opts?.csName || account?.wa_name || 'Tim',
             opts?.baseUrl || env.BASE_URL,
             opts?.vars
         );

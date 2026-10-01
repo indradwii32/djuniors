@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS cs_wa_settings (
     tpl_payment      TEXT    NOT NULL DEFAULT '',
     auto_registration INTEGER NOT NULL DEFAULT 1,
     auto_payment      INTEGER NOT NULL DEFAULT 1,
+    -- Nama yang tampil sebagai {cs_name} di pesan WA. Kosong = pakai
+    -- admin_accounts.name (lihat juga migrasi 010).
+    wa_display_name  TEXT    NOT NULL DEFAULT '',
     updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
