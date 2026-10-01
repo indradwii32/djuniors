@@ -22,14 +22,33 @@ import { formatWATemplate } from '../routes/notifications';
  * Event notifikasi otomatis + template yang dipakai. Satu event = satu baris
  * di editor template, jadi menyalakan/mematikan di dashboard langsung
  * menentukan apakah pesan terkirim.
+ *
+ * `enrollment` sengaja menyatu isi pendaftaran DAN instruksi pembayaran: dua
+ * template terpisah untuk satu langkah (orang tua baru daftar, belum bayar)
+ * hanya menghasilkan dua pesan yang mengulang hal yang sama. Yang dikirim
+ * otomatis empat: daftar+instruksi, menunggu verifikasi, lunas, dan pengingat
+ * belum bayar.
  */
 export const CS_WA_EVENT_TEMPLATES = {
     registration: 'enrollment_confirmed',
     payment_received: 'payment_received',
     payment: 'payment_success',
+    due_reminder: 'due_reminder',
 } as const;
 
 export type CsWaEvent = keyof typeof CS_WA_EVENT_TEMPLATES;
+
+/**
+ * Template yang TIDAK dikirim otomatis. Masih bisa dipakai untuk kirim manual,
+ * tapi saklar aktifnya tidak punya arti otomatis — dimatikan supaya tidak
+ * menyesatkan.
+ */
+export const CS_WA_MANUAL_ONLY_TEMPLATES = new Set([
+    'welcome',
+    'payment_instructions',
+    'class_reminder',
+    'promo',
+]);
 
 /** Nama template DEFAULT bila barisnya belum pernah dibuat di D1. */
 export const CS_WA_FALLBACK_CONTENT: Record<CsWaEvent, string> = {
@@ -51,6 +70,13 @@ export const CS_WA_FALLBACK_CONTENT: Record<CsWaEvent, string> = {
         'sudah kami konfirmasi.\n\n' +
         'Status: Lunas. Kelas siap diikuti — jadwal akan dikonfirmasi oleh tim kami.\n\n' +
         'Salam,\n{cs_name} - D\'Juniors',
+    due_reminder:
+        'Halo {nama_orang_tua}! ⏰\n\n' +
+        'Pendaftaran {nomor_pendaftaran} ({kelas}) belum lunas.\n' +
+        'Sisa waktu bayar: {sisa_hari} hari lagi.\n' +
+        'Nominal: {total_transfer}\n\n' +
+        'Transfer & upload bukti di: {link_pembayaran}\n\n' +
+        'Salam,\n{cs_name} - D\'Juniors',
 };
 
 export interface CsWaSettingsRow {
@@ -65,22 +91,6 @@ export interface CsWaSendResult {
     /** Token mana yang berhasil mengirim (primary = CS, fallback = global/admin). */
     source?: 'primary' | 'fallback' | 'none';
 }
-
-// Template bawaan — dipakai saat CS belum pernah menyimpan setelan.
-export const CS_WA_DEFAULT_TPL_REGISTRATION =
-    'Halo {nama_orang_tua}! 👋\n\n' +
-    'Terima kasih, pendaftaran D\'Juniors untuk {nama_anak} (kelas {kelas}, jadwal {jadwal}) ' +
-    'dengan nomor pendaftaran {nomor_pendaftaran} sudah kami terima.\n\n' +
-    'Untuk menyelesaikan pendaftaran, silakan transfer sesuai instruksi dan kirim bukti pembayaran ' +
-    'melalui halaman lacak berikut:\n{link_pembayaran}\n\n' +
-    'Salam,\n{cs_name} - D\'Juniors';
-
-export const CS_WA_DEFAULT_TPL_PAYMENT =
-    'Halo {nama_orang_tua}! ✅\n\n' +
-    'Pembayaran pendaftaran D\'Juniors (no. {nomor_pendaftaran}, kelas {kelas}) sebesar {nominal} ' +
-    'sudah kami konfirmasi.\n\n' +
-    'Status: Lunas. Kelas siap diikuti — jadwal akan dikonfirmasi oleh tim kami.\n\n' +
-    'Salam,\n{cs_name} - D\'Juniors';
 
 /** Placeholder yang tersedia di template (untuk ditampilkan di UI). */
 export const CS_WA_PLACEHOLDERS = [
@@ -205,9 +215,14 @@ export function renderCsWaMessage(
     template: string,
     registration: Record<string, unknown>,
     csName: string,
-    baseUrl?: string
+    baseUrl?: string,
+    extra?: Record<string, string>
 ): string {
-    return formatWATemplate(template, { ...registration, cs_name: csName }, { baseUrl });
+    return formatWATemplate(
+        template,
+        { ...registration, cs_name: csName, ...(extra || {}) },
+        { baseUrl }
+    );
 }
 
 async function logWa(
@@ -252,6 +267,7 @@ const EVENT_LABEL: Record<CsWaEvent, string> = {
     registration: 'Pendaftaran',
     payment_received: 'Bukti Pembayaran',
     payment: 'Pembayaran Lunas',
+    due_reminder: 'Pengingat Belum Bayar',
 };
 
 /**
@@ -269,7 +285,7 @@ export async function sendCsWaAuto(
         registration_number?: string;
     },
     event: CsWaEvent,
-    opts?: { baseUrl?: string; csName?: string }
+    opts?: { baseUrl?: string; csName?: string; vars?: Record<string, string> }
 ): Promise<CsWaSendResult> {
     try {
         // Cek saklar dulu, sebelum cari CS: event yang dimatikan tidak boleh
@@ -278,19 +294,27 @@ export async function sendCsWaAuto(
         if (!isEnabled) return { status: 'skipped', detail: 'notifikasi_dimatikan' };
 
         const refCode = registration.ref_code;
-        if (!refCode) return { status: 'skipped', detail: 'tanpa_ref_cs' };
         if (!registration.parent_phone) return { status: 'skipped', detail: 'tanpa_nomor' };
 
-        const account = await findAccountByRef(env.DB, refCode);
-        if (!account) return { status: 'skipped', detail: 'cs_tidak_ditemukan' };
+        // Cari CS pemilik link. Tanpa ref_code = daftar umum (bukan lewat link
+        // CS) — masih boleh dikirim ASAL ini event pengingat: pengingat adalah
+        // pesan sistem, bukan pesan dari CS tertentu, dan pelanggan tetap layak
+        // diingatkan. Event lain tetap butuh CS (pesan mereka memakai {cs_name}
+        // dan token device per-CS).
+        const account = refCode ? await findAccountByRef(env.DB, refCode) : null;
+        if (!account && event !== 'due_reminder') {
+            return { status: 'skipped', detail: refCode ? 'cs_tidak_ditemukan' : 'tanpa_ref_cs' };
+        }
 
-        // Token CS = utama. Token global/admin = cadangan: dipakai hanya bila
-        // token utama kosong atau Fonnte menolaknya, sehingga notifikasi tetap
-        // terkirim walau device Fonnte CS sedang bermasalah.
+        // Token CS = utama (bila ada). Token global/admin = cadangan: dipakai
+        // hanya bila token utama kosong atau Fonnte menolaknya, sehingga
+        // notifikasi tetap terkirim walau device Fonnte CS sedang bermasalah.
         // Setelan token ada/tidak TIDAK menentukan pengiriman — yang menentukan
         // adalah template + token global. Kalau tidak, CS yang belum pernah
         // menyimpan token akan diam-diam berhenti menerima notifikasi.
-        const settings = await getCsWaSettings(env.DB, account.id);
+        const settings = account
+            ? await getCsWaSettings(env.DB, account.id)
+            : null;
         const csToken = (settings?.fonnte_token || '').trim();
         const globalToken = (await getFonnteToken(env)).trim();
         if (!csToken && !globalToken) return { status: 'skipped', detail: 'token_kosong' };
@@ -298,8 +322,12 @@ export async function sendCsWaAuto(
         const message = renderCsWaMessage(
             template,
             registration,
-            opts?.csName || account.name || 'CS D\'Juniors',
-            opts?.baseUrl || env.BASE_URL
+            // Pengingat umum tanpa CS. Template menambah sendiri " - D'Juniors",
+            // jadi fallback-nya hanya "Tim" — bukan "Tim D'Juniors" yang akan
+            // menghasilkan tanda tangan ganda.
+            opts?.csName || account?.name || 'Tim',
+            opts?.baseUrl || env.BASE_URL,
+            opts?.vars
         );
         if (!message.trim()) return { status: 'skipped', detail: 'pesan_kosong' };
 

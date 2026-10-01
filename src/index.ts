@@ -22,6 +22,7 @@ import cmsIconsRoutes from './routes/cms-icons';
 import adminUsageRoutes from './routes/admin-usage';
 import dashboardSnapshotsRoutes from './routes/dashboard-snapshots';
 import { generateDashboardSnapshots } from './scheduled/snapshot';
+import { runDueReminders } from './utils/due-reminder';
 import paymentSettingsRoutes from './routes/payment-settings';
 import enrollmentRoutes from './routes/enrollments';
 import paymentRoutes from './routes/payments';
@@ -119,6 +120,10 @@ const CS_ALLOWED_PATTERNS: RegExp[] = [
     // per-CS hanya token Fonnte (di /api/cs/wa-settings). Broadcast manual,
     // log notifikasi, dan pengaturan token global tetap admin-only.
     /^\/api\/notifications\/templates(\/|$)/,
+    // Pengingat belum bayar: durasi, status, dan jalankan-sekarang. Sama
+    // seperti template, ini milik bersama admin & CS — durasi berlaku untuk
+    // semua pendaftar, bukan per-CS.
+    /^\/api\/notifications\/due-reminder(\/|$)/,
     // Status gateway (GET): perlu CS supaya halaman Notifikasi bisa menampilkan
     // apakah device WA tersambung. Endpoint ini hanya membaca — menulis token
     // global tetap di luar daftar ini.
@@ -488,5 +493,25 @@ export const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (event
         console.log(`[scheduled] snapshots written: ${out.months_written} months (${out.months.join(', ')})`);
     } catch (err) {
         console.error('[scheduled] snapshot generation failed:', (err as Error).message);
+    }
+
+    // Pengingat belum bayar. Terpisah dari snapshot supaya kegagalan satu tidak
+    // menghilangkan yang lain, dan karena durasinya bisa diubah admin tanpa
+    // menyentuh jadwal snapshot.
+    try {
+        const rem = await runDueReminders(env as never);
+        if (rem.skipped_disabled) {
+            console.log('[scheduled] due reminders: template dimatikan, dilewati');
+        } else if (rem.skipped_durasi_nol) {
+            console.log('[scheduled] due reminders: durasi 0 hari, dilewati');
+        } else {
+            console.log(
+                `[scheduled] due reminders: ${rem.sent} terkirim, ${rem.failed} gagal, ` +
+                `${rem.candidates} kandidat (>= ${rem.config.days} hari)`
+            );
+            for (const e of rem.errors.slice(0, 10)) console.warn('[scheduled] due reminders:', e);
+        }
+    } catch (err) {
+        console.error('[scheduled] due reminders failed:', (err as Error).message);
     }
 };

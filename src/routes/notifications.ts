@@ -6,6 +6,11 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
 import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, getFonnteToken } from '../utils/fonnte';
+import {
+    getDueReminderConfig,
+    saveDueReminderConfig,
+    runDueReminders,
+} from '../utils/due-reminder';
 
 const notifications = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -448,6 +453,55 @@ notifications.get('/', adminAuthMiddleware, async (c) => {
         'SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100'
     ).all();
     return c.json(result.results);
+});
+
+/**
+ * Durasi pengingat belum bayar (admin & CS).
+ *
+ * Nilai di-clamp di util, jadi request ekstrem tidak akan membuat cron mengirim
+ * ke semua orang atau tidak pernah sama sekali.
+ */
+notifications.get('/due-reminder', adminAuthMiddleware, async (c) => {
+    const cfg = await getDueReminderConfig(c.env.DB);
+    const last = await c.env.DB
+        .prepare(
+            `SELECT COUNT(*) AS n, MAX(sent_at) AS last_at
+             FROM wa_due_reminders`
+        )
+        .first<{ n: number; last_at: string | null }>();
+    const tpl = await c.env.DB
+        .prepare('SELECT is_enabled FROM wa_templates WHERE id = ?')
+        .bind('due_reminder')
+        .first<{ is_enabled: number }>();
+
+    return c.json({
+        success: true,
+        config: cfg,
+        template_enabled: tpl ? Boolean(tpl.is_enabled) : false,
+        sent_count: Number(last?.n || 0),
+        last_sent_at: last?.last_at || null,
+        cron: '0 2 * * * (02:00 UTC / 09:00 WIB)',
+    });
+});
+
+/** Simpan durasi pengingat (admin & CS). */
+notifications.put('/due-reminder', adminAuthMiddleware, async (c) => {
+    const body = await c.req.json() as any;
+    const cfg = await saveDueReminderConfig(c.env.DB, {
+        days: body.days,
+        repeat_every: body.repeat_every,
+    });
+    return c.json({ success: true, config: cfg });
+});
+
+/**
+ * Jalankan pengingat sekarang (admin & CS) — untuk mencoba konfigurasi tanpa
+ * menunggu cron malam. Aman dipanggil berkali-kali: yang sudah dikirimi tidak
+ * akan dikirimi lagi.
+ */
+notifications.post('/due-reminder/run', adminAuthMiddleware, async (c) => {
+    const out = await runDueReminders(c.env as never);
+    return c.json({ success: true, ...out });
 });
 
 // Get all WA templates (admin + CS)

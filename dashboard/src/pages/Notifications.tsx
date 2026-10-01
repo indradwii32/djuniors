@@ -24,6 +24,7 @@ import {
   Check,
   Info,
   BellRing,
+  Play,
 } from 'lucide-react';
 import {
   notificationsApi,
@@ -58,11 +59,25 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
   },
   enrollment_confirmed: {
     id: 'enrollment_confirmed',
-    name: 'Konfirmasi Pendaftaran',
+    name: 'Pendaftaran + Instruksi Pembayaran',
     badge: '✅ Pendaftaran',
-    description: 'Notifikasi saat pendaftaran kelas anak berhasil diverifikasi oleh admin.',
-    placeholders: ['{nama}', '{nama_orang_tua}', '{nama_anak}', '{nomor_pendaftaran}', '{nama_kelas}', '{jadwal}', '{kota}'],
-    content: `✅ *Pendaftaran Berhasil!*\n\nHalo {nama}!\n\nPendaftaran untuk Ananda *{nama_anak}* telah dikonfirmasi.\n🔖 No. Pendaftaran: *{nomor_pendaftaran}*\n📚 Kelas: *{nama_kelas}*\n📅 Jadwal: *{jadwal}*\n\nMateri dan link kelas akan dikirimkan segera.\n\nSemangat belajar! 💪`,
+    description:
+      'Dikirim saat pendaftar mengisi form. Satu pesan: konfirmasi pendaftaran sekaligus cara membayar.',
+    placeholders: [
+      '{nama}',
+      '{nama_orang_tua}',
+      '{nama_anak}',
+      '{nomor_pendaftaran}',
+      '{nama_kelas}',
+      '{jadwal}',
+      '{kota}',
+      '{nama_bank}',
+      '{nomor_rekening}',
+      '{nama_pemilik_rekening}',
+      '{total_transfer}',
+      '{link_pembayaran}',
+    ],
+    content: `✅ *Pendaftaran Berhasil!*\n\nHalo {nama_orang_tua}!\n\nPendaftaran untuk Ananda *{nama_anak}* ({nama_kelas}, jadwal {jadwal}) sudah kami terima.\n🔖 No. Pendaftaran: *{nomor_pendaftaran}*\n\n---\n\n💳 *Instruksi Pembayaran*\n\n🏦 Bank: *{nama_bank}*\n📄 Rekening: *{nomor_rekening}* ({nama_pemilik_rekening})\n💰 Total: *{total_transfer}*\n\n⚠️ Transfer tepat sampai digit terakhir agar pembayaran terdeteksi otomatis.\n\n📸 Upload bukti transfer di: {link_pembayaran}`,
   },
   payment_instructions: {
     id: 'payment_instructions',
@@ -100,6 +115,26 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
     ],
     content: `🕐 *Bukti Pembayaran Diterima*\n\nHalo {nama_orang_tua}!\n\nBukti transfer untuk pendaftaran *{nomor_pendaftaran}* sudah kami terima.\n💰 Nominal: *{total_transfer}*\n🏦 {nama_bank} — {nama_pemilik_rekening}\n\n⏳ Pembayaran sedang kami verifikasi. Anda akan diberi tahu segera setelah selesai.\n\nSalam,\n{cs_name} - D'Juniors`,
   },
+  due_reminder: {
+    id: 'due_reminder',
+    name: 'Pengingat Belum Bayar',
+    badge: '⏰ Belum Bayar',
+    description:
+      'Dikirim otomatis oleh cron harian ke pendaftar yang belum lunas, setelah lewat durasi yang diatur di bawah.',
+    placeholders: [
+      '{nama}',
+      '{nama_orang_tua}',
+      '{nomor_pendaftaran}',
+      '{nama_kelas}',
+      '{total_transfer}',
+      '{nama_bank}',
+      '{nomor_rekening}',
+      '{nama_pemilik_rekening}',
+      '{sisa_hari}',
+      '{link_pembayaran}',
+    ],
+    content: `⏰ *Pengingat Pembayaran*\n\nHalo {nama_orang_tua}!\n\nPendaftaran *{nomor_pendaftaran}* ({nama_kelas}) belum lunas.\nSisa waktu bayar: *{sisa_hari} hari lagi*\n💰 Tagihan: *{total_transfer}*\n\n🏦 {nama_bank} — {nomor_rekening} ({nama_pemilik_rekening})\n\n📸 Bayar & upload bukti di: {link_pembayaran}\n\nSalam,\n{cs_name} - D'Juniors`,
+  },
   payment_success: {
     id: 'payment_success',
     name: 'Konfirmasi Pembayaran Diterima',
@@ -127,14 +162,40 @@ export const DEFAULT_TEMPLATES_MAP: Record<string, TemplateMeta> = {
 };
 
 /**
- * Template yang dipakai notifikasi OTOMATIS ke pendaftar, dan saat pesan dikirim.
- * tiga baris ini = tiga notifikasi yang dikirim ke customer. Saklar aktif ada di
- * tiap template, jadi mengaktifkan/mematikan di editor = mematikan notifikasi itu.
+ * Empat template yang dipakai notifikasi OTOMATIS ke customer.
+ *
+ * `enrollment_confirmed` menyatu dua hal yang sebelumnya terpisah: konfirmasi
+ * pendaftaran dan instruksi pembayaran. Satu orang tua yang baru daftar belum
+ * melakukan apa-apa lagi, jadi dua pesan hanya mengulang hal yang sama.
+ *
+ * Template lain di DEFAULT_TEMPLATES_MAP (welcome, payment_instructions,
+ * class_reminder, promo) tidak punya event otomatis — hanya bisa dikirim
+ * manual, dan saklarnya tidak ditampilkan.
  */
-export const AUTO_NOTIFY_EVENTS: Record<string, { label: string; templateId: string }> = {
-  enrollment_confirmed: { label: 'Pendaftaran diterima', templateId: 'enrollment_confirmed' },
-  payment_received: { label: 'Bukti pembayaran masuk (menunggu verifikasi)', templateId: 'payment_received' },
-  payment_success: { label: 'Pembayaran lunas dikonfirmasi', templateId: 'payment_success' },
+export const AUTO_NOTIFY_EVENTS: Record<
+  string,
+  { label: string; templateId: string; hint?: string }
+> = {
+  enrollment_confirmed: {
+    label: 'Pendaftaran + instruksi pembayaran',
+    templateId: 'enrollment_confirmed',
+    hint: 'Dikirim saat pendaftar mengisi form. Satu pesan berisi konfirmasi dan cara bayar.',
+  },
+  payment_received: {
+    label: 'Menunggu pembayaran diverifikasi',
+    templateId: 'payment_received',
+    hint: 'Dikirim saat bukti pembayaran diunggah, sebelum dicek admin/CS.',
+  },
+  payment_success: {
+    label: 'Pembayaran lunas',
+    templateId: 'payment_success',
+    hint: 'Dikirim saat admin atau CS mengonfirmasi pembayaran.',
+  },
+  due_reminder: {
+    label: 'Pengingat belum bayar (terjadwal)',
+    templateId: 'due_reminder',
+    hint: 'Dikirim otomatis oleh cron harian ke yang belum lunas, setelah lewat durasi yang diatur di bawah.',
+  },
 };
 
 const QUICK_TEMPLATES = [
@@ -657,6 +718,69 @@ export const Notifications: React.FC = () => {
     }
   };
 
+  // ======================= Pengingat belum bayar (terjadwal) =======================
+  const [dueCfg, setDueCfg] = useState<{ days: number; repeat_every: number }>({ days: 3, repeat_every: 0 });
+  const [dueMeta, setDueMeta] = useState<{ template_enabled: boolean; sent_count: number; last_sent_at: string | null; cron: string } | null>(null);
+  const [isSavingDue, setIsSavingDue] = useState(false);
+  const [isRunningDue, setIsRunningDue] = useState(false);
+
+  const loadDue = useCallback(async () => {
+    try {
+      const res = await notificationsApi.getDueReminder();
+      setDueCfg(res.config);
+      setDueMeta({
+        template_enabled: res.template_enabled,
+        sent_count: res.sent_count,
+        last_sent_at: res.last_sent_at,
+        cron: res.cron,
+      });
+    } catch {
+      // Biarkan nilai default — panel tetap bisa dipakai untuk menyalakan/mematikan.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDue();
+  }, [loadDue]);
+
+  const handleSaveDue = async () => {
+    try {
+      setIsSavingDue(true);
+      const res = await notificationsApi.saveDueReminder({
+        days: Number(dueCfg.days) || 0,
+        repeat_every: Number(dueCfg.repeat_every) || 0,
+      });
+      setDueCfg(res.config);
+      showToast(`Durasi pengingat disimpan: ${res.config.days} hari setelah pendaftaran.`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal menyimpan durasi', 'error');
+    } finally {
+      setIsSavingDue(false);
+    }
+  };
+
+  const handleRunDueNow = async () => {
+    try {
+      setIsRunningDue(true);
+      const res = await notificationsApi.runDueReminderNow();
+      if (res.skipped_disabled) {
+        showToast('Dilewati: template "Pengingat Belum Bayar" sedang nonaktif.', 'info');
+      } else if (res.skipped_durasi_nol) {
+        showToast('Dilewati: durasi pengingat masih 0 hari.', 'info');
+      } else {
+        showToast(
+          `Selesai: ${res.sent} terkirim, ${res.failed} gagal dari ${res.candidates} kandidat.`,
+          res.failed > 0 ? 'error' : 'success'
+        );
+      }
+      loadDue();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal menjalankan pengingat', 'error');
+    } finally {
+      setIsRunningDue(false);
+    }
+  };
+
   // Quick Select Student as Recipient
   const handleSelectStudentRecipient = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const studentId = e.target.value;
@@ -904,6 +1028,11 @@ export const Notifications: React.FC = () => {
                 <div style={{ fontSize: '0.725rem', color: '#64748B' }}>
                   Aktif untuk event: <strong>{AUTO_NOTIFY_EVENTS[selectedTemplateId].label}</strong>
                 </div>
+                {AUTO_NOTIFY_EVENTS[selectedTemplateId].hint && (
+                  <div style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: '2px' }}>
+                    {AUTO_NOTIFY_EVENTS[selectedTemplateId].hint}
+                  </div>
+                )}
               </div>
             </div>
             <label
@@ -924,6 +1053,181 @@ export const Notifications: React.FC = () => {
               />
               {isSelectedTemplateEnabled ? 'AKTIF — dikirim ke customer' : 'NONAKTIF — tidak dikirim'}
             </label>
+          </div>
+        )}
+
+        {/* Pengaturan durasi — hanya untuk pengingat terjadwal */}
+        {selectedTemplateId === 'due_reminder' && (
+          <div
+            style={{
+              backgroundColor: '#FFFBEB',
+              border: '1px solid #FCD34D',
+              borderRadius: '12px',
+              padding: '1rem 1.1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={16} color="#B45309" />
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#78350F' }}>
+                  Durasi pengingat
+                </div>
+                <div style={{ fontSize: '0.725rem', color: '#92400E' }}>
+                  Berlaku untuk semua pendaftar yang belum lunas — bukan per CS.
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: '#78350F',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Kirim setelah (hari)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={dueCfg.days}
+                  onChange={(e) => setDueCfg({ ...dueCfg, days: Number(e.target.value) })}
+                  style={{
+                    width: '120px',
+                    padding: '0.5rem 0.65rem',
+                    borderRadius: '8px',
+                    border: '1px solid #FCD34D',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    color: '#78350F',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Ulangi tiap (hari)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={dueCfg.repeat_every}
+                  onChange={(e) => setDueCfg({ ...dueCfg, repeat_every: Number(e.target.value) })}
+                  style={{
+                    width: '120px',
+                    padding: '0.5rem 0.65rem',
+                    borderRadius: '8px',
+                    border: '1px solid #FCD34D',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                />
+              </div>
+              <button
+                onClick={handleSaveDue}
+                disabled={isSavingDue}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.55rem 1.1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: isSavingDue ? '#94A3B8' : '#B45309',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.825rem',
+                  cursor: isSavingDue ? 'wait' : 'pointer',
+                }}
+              >
+                {isSavingDue ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                {isSavingDue ? 'Menyimpan...' : 'Simpan Durasi'}
+              </button>
+              <button
+                onClick={handleRunDueNow}
+                disabled={isRunningDue}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.55rem 1.1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #B45309',
+                  backgroundColor: '#FFFFFF',
+                  color: '#B45309',
+                  fontWeight: 800,
+                  fontSize: '0.825rem',
+                  cursor: isRunningDue ? 'wait' : 'pointer',
+                }}
+              >
+                {isRunningDue ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Play size={14} />
+                )}
+                {isRunningDue ? 'Menjalankan...' : 'Jalankan Sekarang'}
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.72rem', color: '#92400E', lineHeight: 1.5 }}>
+              {dueCfg.days === 0 ? (
+                <strong>Durasi 0 = pengingat tidak dikirim.</strong>
+              ) : (
+                <>
+                  Pendaftar yang sudah <strong>{dueCfg.days} hari</strong> dan belum lunas akan
+                  dikirimi pengingat. {dueCfg.repeat_every > 0 ? (
+                    <>
+                      Diulang tiap <strong>{dueCfg.repeat_every} hari</strong> sampai lunas.
+                    </>
+                  ) : (
+                    <>Dikirim <strong>sekali saja</strong> per pendaftaran.</>
+                  )}
+                </>
+              )}
+              {dueMeta && (
+                <>
+                  {' '}
+                  Dijalankan otomatis oleh cron {dueMeta.cron}. Sudah terkirim ke{' '}
+                  <strong>{dueMeta.sent_count}</strong> pendaftaran
+                  {dueMeta.last_sent_at
+                    ? ` (terakhir ${new Date(dueMeta.last_sent_at + 'Z').toLocaleString('id-ID')})`
+                    : ''}
+                  .
+                </>
+              )}
+              {dueMeta && !dueMeta.template_enabled && (
+                <>
+                  {' '}
+                  <strong style={{ color: '#B91C1C' }}>
+                    Template sedang nonaktif — durasi tidak akan dipakai sampai saklarnya
+                    dinyalakan.
+                  </strong>
+                </>
+              )}
+            </div>
           </div>
         )}
 

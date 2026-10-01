@@ -1058,6 +1058,21 @@ export interface WaStatus {
   quota?: number;
   expired?: string | null;
 }
+/**
+ * Status pengingat belum bayar. `days` = berapa hari setelah pendaftaran
+ * pengingat dikirim (0 = mati). `repeat_every` = kirim ulang tiap N hari
+ * (0 = sekali saja).
+ */
+export interface DueReminderStatus {
+  success: boolean;
+  config: { days: number; repeat_every: number };
+  /** Saklar template due_reminder — keduanya harus aktif agar terkirim. */
+  template_enabled: boolean;
+  sent_count: number;
+  last_sent_at: string | null;
+  cron: string;
+}
+
 export const notificationsApi = {
   getAll: async (): Promise<NotificationItem[]> => {
     return apiRequest<NotificationItem[]>('/notifications');
@@ -1082,6 +1097,30 @@ export const notificationsApi = {
   },
   getWaStatus: async (): Promise<WaStatus> => {
     return apiRequest<WaStatus>('/notifications/wa/status');
+  },
+  /** Durasi + status pengingat belum bayar (cron harian). */
+  getDueReminder: async (): Promise<DueReminderStatus> => {
+    return apiRequest<DueReminderStatus>('/notifications/due-reminder');
+  },
+  saveDueReminder: async (payload: {
+    days: number;
+    repeat_every: number;
+  }): Promise<{ success: boolean; config: { days: number; repeat_every: number } }> => {
+    return apiRequest('/notifications/due-reminder', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+  runDueReminderNow: async (): Promise<{
+    success: boolean;
+    sent: number;
+    failed: number;
+    candidates: number;
+    skipped_disabled: boolean;
+    skipped_durasi_nol: boolean;
+    errors: string[];
+  }> => {
+    return apiRequest('/notifications/due-reminder/run', { method: 'POST' });
   },
   sendBulkPromo: async (
     promoId: string,

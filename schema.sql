@@ -291,6 +291,32 @@ CREATE TABLE IF NOT EXISTS wa_templates (
 
 CREATE INDEX IF NOT EXISTS idx_wa_templates_updated_at ON wa_templates(updated_at DESC);
 
+-- Riwayat pengiriman pengingat belum bayar (event due_reminder, cron harian).
+-- Tanpa tabel ini cron akan mengirim pesan yang sama setiap hari sampai lunas.
+CREATE TABLE IF NOT EXISTS wa_due_reminders (
+    registration_id  TEXT PRIMARY KEY REFERENCES registrations(id) ON DELETE CASCADE,
+    sent_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    days_left        INTEGER,
+    template_version INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_wa_due_reminders_sent_at ON wa_due_reminders(sent_at DESC);
+
+-- Template pengingat: default NONAKTIF, admin/CS menyalakan dari editor.
+INSERT OR IGNORE INTO wa_templates (id, name, content, version, is_enabled) VALUES (
+    'due_reminder',
+    'Pengingat Belum Bayar',
+    '⏰ *Pengingat Pembayaran*' || char(10) || char(10) ||
+    'Halo {nama_orang_tua}!' || char(10) || char(10) ||
+    'Pendaftaran *{nomor_pendaftaran}* ({nama_kelas}) belum lunas.' || char(10) ||
+    'Sisa waktu bayar: *{sisa_hari} hari lagi*' || char(10) ||
+    '💰 Tagihan: *{total_transfer}*' || char(10) || char(10) ||
+    '🏦 {nama_bank} — {nomor_rekening} ({nama_pemilik_rekening})' || char(10) || char(10) ||
+    '📸 Bayar & upload bukti di: {link_pembayaran}' || char(10) || char(10) ||
+    'Salam,' || char(10) || '{cs_name} - D''Juniors',
+    1,
+    0
+);
+
 -- Default WA Message Templates Seed (v2, idempotent for fresh DB)
 INSERT OR IGNORE INTO wa_templates (id, name, content, version) VALUES
     (
