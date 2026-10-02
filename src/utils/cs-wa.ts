@@ -82,9 +82,20 @@ export const CS_WA_FALLBACK_CONTENT: Record<CsWaEvent, string> = {
 export interface CsWaSettingsRow {
     admin_account_id: string;
     fonnte_token: string;
-    /** Nama pengirim untuk {cs_name}; '' = pakai nama akun (lihat migrasi 010). */
-    wa_display_name?: string;
     updated_at?: string;
+}
+
+/**
+ * Nama yang tampil untuk sebuah CS di seluruh aplikasi.
+ * Prioritas: display_name (profil, bisa diedit sendiri oleh CS) → name
+ * (username/label internal milik admin). Satu sumber untuk pesan WA,
+ * dashboard, dan laporan — lihat migrasi 012.
+ */
+export function resolveAccountDisplayName(
+    account: { name: string; display_name?: string | null } | null | undefined
+): string {
+    if (!account) return 'Tim';
+    return (account.display_name || '').trim() || account.name || 'Tim';
 }
 
 export interface CsWaSendResult {
@@ -145,41 +156,22 @@ export function maskToken(token: string): string {
 
 /**
  * Cari akun CS berdasarkan kode ref-nya.
- * `wa_name` = nama pengirim hasil resolusi (wa_display_name bila diisi, kalau
- * tidak nama akun) — inilah yang tampil sebagai {cs_name}.
+ * `wa_name` = nama yang tampil (display_name bila diisi, kalau tidak nama akun)
+ * — inilah yang muncul sebagai {cs_name} dan di seluruh UI.
  */
 export async function findAccountByRef(
     db: D1Database,
     refCode: string
-): Promise<{ id: string; name: string; ref_code: string; wa_name: string } | null> {
+): Promise<{ id: string; name: string; display_name: string | null; ref_code: string; wa_name: string } | null> {
     return db
         .prepare(
-            `SELECT a.id, a.name, a.ref_code,
-                    COALESCE(NULLIF(TRIM(s.wa_display_name), ''), a.name) AS wa_name
-             FROM admin_accounts a
-             LEFT JOIN cs_wa_settings s ON s.admin_account_id = a.id
-             WHERE a.ref_code = ?`
+            `SELECT id, name, display_name, ref_code,
+                    COALESCE(NULLIF(TRIM(display_name), ''), name) AS wa_name
+             FROM admin_accounts
+             WHERE ref_code = ?`
         )
         .bind(refCode)
         .first();
-}
-
-/**
- * Nama pengirim final untuk satu akun CS. Prioritas: wa_display_name (punya
- * CS sendiri, bisa diisi tanpa akses admin) → nama akun (dipakai admin).
- * Nama akun diambil ulang kalau baris setelannya belum ada.
- */
-export async function resolveCsDisplayName(
-    db: D1Database,
-    account: { id: string; name: string } | null | undefined
-): Promise<string> {
-    if (!account) return 'Tim';
-    const row = await db
-        .prepare('SELECT wa_display_name FROM cs_wa_settings WHERE admin_account_id = ?')
-        .bind(account.id)
-        .first<{ wa_display_name: string | null }>();
-    const custom = (row?.wa_display_name || '').trim();
-    return custom || account.name || 'Tim';
 }
 
 /** Ambil setelan CS; null bila CS belum pernah menyimpan (→ pakai default). */
@@ -202,8 +194,6 @@ export function serializeCsWaSettings(row: CsWaSettingsRow | null) {
     return {
         fonnte_token_masked: maskToken(storedToken),
         fonnte_token_set: storedToken.length > 0,
-        wa_display_name: (row?.wa_display_name || '').trim(),
-        wa_display_name_set: (row?.wa_display_name || '').trim().length > 0,
         is_default: !row,
         updated_at: row?.updated_at || null,
     };
@@ -220,7 +210,6 @@ export async function saveCsWaSettings(
     patch: {
         fonnte_token?: string;
         clear_token?: boolean;
-        wa_display_name?: string;
     }
 ): Promise<void> {
     const existing = await getCsWaSettings(db, accountId);
@@ -231,21 +220,15 @@ export async function saveCsWaSettings(
         token = patch.fonnte_token.trim();
     }
 
-    // Nama pengirim: hanya ditulis bila dikirim. Tidak dikirim = biarkan yang
-    // ada, supaya PartialUpdate dari form lama tidak diam-diam mengosongkan.
-    let displayName = (existing?.wa_display_name || '').trim();
-    if (typeof patch.wa_display_name === 'string') displayName = patch.wa_display_name.trim();
-
     await db
         .prepare(
-            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, wa_display_name, updated_at)
-             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            `INSERT INTO cs_wa_settings (admin_account_id, fonnte_token, updated_at)
+             VALUES (?, ?, CURRENT_TIMESTAMP)
              ON CONFLICT(admin_account_id) DO UPDATE SET
                 fonnte_token = excluded.fonnte_token,
-                wa_display_name = excluded.wa_display_name,
                 updated_at = CURRENT_TIMESTAMP`
         )
-        .bind(accountId, token, displayName)
+        .bind(accountId, token)
         .run();
 }
 

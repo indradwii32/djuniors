@@ -107,6 +107,9 @@ export const Settings: React.FC = () => {
   const [teamEditId, setTeamEditId] = useState<string | null>(null);
   const [teamUsername, setTeamUsername] = useState<string>('');
   const [teamName, setTeamName] = useState<string>('');
+  // Nama yang tampil di dashboard/laporan/pesan WA. Boleh diisi/dikosongkan
+  // di sini, dan bisa juga diubah sendiri oleh CS lewat Profil Akun.
+  const [teamDisplayName, setTeamDisplayName] = useState<string>('');
   const [teamPassword, setTeamPassword] = useState<string>('');
   const [teamRole, setTeamRole] = useState<'cs' | 'admin'>('cs');
   const [isSavingTeam, setIsSavingTeam] = useState<boolean>(false);
@@ -317,6 +320,7 @@ export const Settings: React.FC = () => {
     setTeamEditId(null);
     setTeamUsername('');
     setTeamName('');
+    setTeamDisplayName('');
     setTeamPassword('');
     setTeamRole('cs');
     setIsTeamModalOpen(true);
@@ -327,6 +331,7 @@ export const Settings: React.FC = () => {
     setTeamEditId(acc.id);
     setTeamUsername(acc.username);
     setTeamName(acc.name);
+    setTeamDisplayName(acc.display_name || '');
     setTeamPassword('');
     setTeamRole(acc.role === 'admin' || acc.role === 'super_admin' ? 'admin' : 'cs');
     setIsTeamModalOpen(true);
@@ -345,9 +350,17 @@ export const Settings: React.FC = () => {
         });
         showToast(res?.message || 'Akun berhasil dibuat');
       } else {
-        const payload: { name: string; role: string; password?: string } = {
+        const payload: {
+          name: string;
+          role: string;
+          display_name?: string;
+          password?: string;
+        } = {
           name: teamName.trim(),
           role: teamRole,
+          // Selalu dikirim saat edit: string kosong berarti "pakai nama
+          // akun". Kalau tidak dikirim, nilai lama CS tidak bisa dikosongkan.
+          display_name: teamDisplayName.trim(),
         };
         if (teamPassword) payload.password = teamPassword;
         await adminAccountsApi.update(teamEditId!, payload);
@@ -1480,7 +1493,7 @@ export const Settings: React.FC = () => {
                             {idx + 1}
                           </span>
                           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {acc ? acc.name : refCode}
+                            {acc ? (acc.display_name || acc.name) : refCode}
                             <span style={{ fontWeight: 500, color: '#94A3B8', fontSize: '0.75rem' }}> · {refCode}</span>
                           </span>
                           <button
@@ -1552,7 +1565,7 @@ export const Settings: React.FC = () => {
                               style={{ cursor: 'pointer', accentColor: '#6D28D9' }}
                             />
                             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', flex: 1 }}>
-                              {a.name}
+                              {a.display_name || a.name}
                               <span style={{ fontWeight: 500, color: '#94A3B8', fontSize: '0.75rem' }}>
                                 {' '}· {a.ref_code || 'tanpa ref'}
                                 {!a.is_active ? ' · nonaktif' : ''}
@@ -1611,7 +1624,14 @@ export const Settings: React.FC = () => {
                           <td style={{ padding: '1rem 1.25rem', fontFamily: 'monospace', fontWeight: 700, color: '#1E293B', fontSize: '0.875rem' }}>
                             @{acc.username}
                           </td>
-                          <td style={{ padding: '1rem 1.25rem', fontWeight: 700, color: '#1E293B' }}>{acc.name}</td>
+                          <td style={{ padding: '1rem 1.25rem', fontWeight: 700, color: '#1E293B' }}>
+                            {acc.display_name || acc.name}
+                            {acc.display_name && acc.display_name !== acc.name && (
+                              <div style={{ fontSize: '0.72rem', fontWeight: 500, color: '#94A3B8' }}>
+                                {acc.name}
+                              </div>
+                            )}
+                          </td>
                           <td style={{ padding: '1rem 1.25rem' }}>
                             <span
                               style={{
@@ -1933,7 +1953,30 @@ export const Settings: React.FC = () => {
                   placeholder="Contoh: Rina (CS)"
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
                 />
+                <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                  Label internal. Dipakai admin untuk mengenali akun, tidak tampil ke pelanggan.
+                </p>
               </div>
+
+              {teamModalMode === 'edit' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>
+                    Nama yang Tampil
+                  </label>
+                  <input
+                    type="text"
+                    value={teamDisplayName}
+                    onChange={(e) => setTeamDisplayName(e.target.value)}
+                    placeholder={teamName.trim() || 'Kosongkan untuk memakai nama di atas'}
+                    maxLength={80}
+                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none' }}
+                  />
+                  <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#94A3B8' }}>
+                    Ditampilkan di dashboard, laporan harian, dan tanda tangan pesan WhatsApp. Kosongkan untuk
+                    memakai nama di atas. CS juga bisa mengubahnya sendiri lewat menu Profil Akun.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>

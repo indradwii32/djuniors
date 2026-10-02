@@ -21,10 +21,11 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
+import { resolveAccountDisplayName } from '../utils/cs-wa';
 
 const reports = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-type CsAccount = { id: string; name: string; ref_code: string | null };
+type CsAccount = { id: string; name: string; display_name?: string | null; ref_code: string | null };
 
 /** Batas hari ke depan: 0 = laporan hanya untuk hari ini atau lampau. */
 const MAX_DAYS_AHEAD = 0;
@@ -119,7 +120,7 @@ async function resolveOwner(
             };
         }
         const acc = await c.env.DB.prepare(
-            'SELECT id, name, ref_code FROM admin_accounts WHERE id = ?'
+            'SELECT id, name, display_name, ref_code FROM admin_accounts WHERE id = ?'
         ).bind(payload.userId).first();
         if (!acc) {
             return { ok: false, status: 403, error: 'Forbidden', message: 'Akun CS tidak ditemukan' };
@@ -153,10 +154,10 @@ async function resolveOwner(
 
     const acc = ref
         ? await c.env.DB.prepare(
-              'SELECT id, name, ref_code FROM admin_accounts WHERE ref_code = ?'
+              'SELECT id, name, display_name, ref_code FROM admin_accounts WHERE ref_code = ?'
           ).bind(ref).first()
         : await c.env.DB.prepare(
-              'SELECT id, name, ref_code FROM admin_accounts WHERE id = ?'
+              'SELECT id, name, display_name, ref_code FROM admin_accounts WHERE id = ?'
           ).bind(accountId).first();
 
     if (!acc) {
@@ -214,7 +215,7 @@ reports.get('/reports', adminAuthMiddleware, async (c) => {
         SELECT
             d.report_date,
             d.cs_account_id,
-            a.name AS cs_name,
+            COALESCE(NULLIF(TRIM(a.display_name), ''), a.name) AS cs_name,
             a.ref_code,
             d.chat_masuk,
             d.catatan,
@@ -447,7 +448,7 @@ reports.put('/reports', adminAuthMiddleware, async (c) => {
         report: {
             report_date: dateCheck.date,
             cs_account_id: owner.account.id,
-            cs_name: owner.account.name,
+            cs_name: resolveAccountDisplayName(owner.account),
             ref_code: owner.account.ref_code,
             chat_masuk: chat,
             catatan,

@@ -14,7 +14,7 @@ import {
     saveCsWaSettings,
     serializeCsWaSettings,
     findAccountByRef,
-    resolveCsDisplayName,
+    resolveAccountDisplayName,
     renderCsWaMessage,
     loadEventTemplateForEvent,
     CS_WA_EVENT_TEMPLATES,
@@ -25,7 +25,13 @@ import {
 
 const cs = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-type WaAccount = { id: string; name: string; ref_code: string | null; wa_name?: string };
+type WaAccount = {
+    id: string;
+    name: string;
+    display_name?: string | null;
+    ref_code: string | null;
+    wa_name?: string;
+};
 type WaAccountErr = { status: number; error: string; message: string };
 function isWaErr(v: WaAccount | WaAccountErr): v is WaAccountErr {
     return 'status' in v;
@@ -38,7 +44,7 @@ function isWaErr(v: WaAccount | WaAccountErr): v is WaAccountErr {
 async function resolveWaAccount(c: any, payload: any): Promise<WaAccount | WaAccountErr> {
     if (isCSRole(payload)) {
         const acc = await c.env.DB.prepare(
-            'SELECT id, name, ref_code FROM admin_accounts WHERE id = ?'
+            'SELECT id, name, display_name, ref_code FROM admin_accounts WHERE id = ?'
         ).bind(payload.userId).first();
         if (!acc) return { status: 403, error: 'Forbidden', message: 'Akun CS tidak ditemukan' };
         // ?ref diabaikan untuk CS (selalu pakai akunnya sendiri). Kalau
@@ -60,7 +66,7 @@ async function resolveWaAccount(c: any, payload: any): Promise<WaAccount | WaAcc
     if (ref) acc = await findAccountByRef(c.env.DB, ref);
     else if (accountId) {
         acc = await c.env.DB.prepare(
-            'SELECT id, name, ref_code FROM admin_accounts WHERE id = ?'
+            'SELECT id, name, display_name, ref_code FROM admin_accounts WHERE id = ?'
         ).bind(accountId).first();
     }
     if (!acc) {
@@ -177,11 +183,15 @@ cs.get('/wa-settings', adminAuthMiddleware, async (c) => {
 
     return c.json({
         success: true,
-        account: { id: account.id, name: account.name, ref_code: account.ref_code },
-        // Nama yang benar-benar dipakai untuk {cs_name}: wa_display_name bila
-        // diisi, kalau tidak nama akun. CS bisa melihat ini tanpa perlu
-        // kolom akun yang hanya boleh diubah admin.
-        wa_display_name: await resolveCsDisplayName(c.env.DB, account),
+        account: {
+            id: account.id,
+            name: account.name,
+            display_name: account.display_name || '',
+            ref_code: account.ref_code,
+        },
+        // Nama yang dipakai untuk {cs_name} dan di seluruh UI. Disunting dari
+        // halaman Profil Akun, bukan dari kartu token.
+        display_name: resolveAccountDisplayName(account),
         settings: serializeCsWaSettings(row),
         placeholders: CS_WA_PLACEHOLDERS,
         placeholder_hints: CS_WA_PLACEHOLDER_HINTS,
@@ -200,16 +210,10 @@ cs.put('/wa-settings', adminAuthMiddleware, async (c) => {
     await saveCsWaSettings(c.env.DB, account.id, {
         fonnte_token: typeof body.fonnte_token === 'string' ? body.fonnte_token : undefined,
         clear_token: body.clear_token === true,
-        wa_display_name:
-            typeof body.wa_display_name === 'string' ? body.wa_display_name : undefined,
     });
 
     const row = await getCsWaSettings(c.env.DB, account.id);
-    return c.json({
-        success: true,
-        settings: serializeCsWaSettings(row),
-        wa_display_name: await resolveCsDisplayName(c.env.DB, account),
-    });
+    return c.json({ success: true, settings: serializeCsWaSettings(row) });
 });
 
 /** Registrasi + akun CS-nya (untuk preview & kirim manual, dengan scoping). */
@@ -237,10 +241,10 @@ async function loadScopedRegistration(c: any, payload: any) {
             csAccount = own as WaAccount | null;
         }
     }
-    // Nama pengirim ({cs_name}) hanya ada di kolom wa_display_name; query akun
-    // polos tidak mengambilnya.
+    // Nama pengirim ({cs_name}) hanya ada di kolom display_name; query akun polos
+    // tidak mengambilnya.
     if (csAccount && !csAccount.wa_name) {
-        csAccount.wa_name = await resolveCsDisplayName(c.env.DB, csAccount);
+        csAccount.wa_name = resolveAccountDisplayName(csAccount);
     }
     return { reg, csAccount };
 }
@@ -369,7 +373,7 @@ cs.post('/wa-test', adminAuthMiddleware, async (c) => {
     const phone = String(body.phone || '').trim();
     if (!phone) return c.json({ error: 'Phone required', message: 'Nomor tujuan wajib diisi' }, 400);
 
-    const waName = await resolveCsDisplayName(c.env.DB, account);
+    const waName = resolveAccountDisplayName(account);
     const message = String(body.message || '').trim() ||
         `✅ *Tes Notifikasi WhatsApp D'Juniors*\n\nHalo! Ini adalah pesan tes dari *${waName}*.\nJika Anda menerima pesan ini, koneksi Fonnte aktif.`;
 

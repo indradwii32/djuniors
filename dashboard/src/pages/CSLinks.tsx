@@ -185,7 +185,7 @@ export const CSLinks: React.FC = () => {
     ? accounts.length === 0
       ? 'Belum ada akun CS aktif. Buat akun CS terlebih dahulu di Pengaturan Sistem → Akun Tim.'
       : selectedAccount && !selectedAccount.ref_code
-        ? `Akun CS "${selectedAccount.name}" belum memiliki kode link. Atur kode ref-nya di Pengaturan Sistem → Akun Tim.`
+        ? `Akun CS "${selectedAccount.display_name || selectedAccount.name}" belum memiliki kode link. Atur kode ref-nya di Pengaturan Sistem → Akun Tim.`
         : 'Pilih CS pada dropdown "Buat link untuk CS" untuk membuat link pendaftaran.'
     : 'Akun Anda belum memiliki kode link. Hubungi administrator.';
 
@@ -289,7 +289,7 @@ export const CSLinks: React.FC = () => {
                 {accounts.length === 0 && <option value="">— Belum ada akun CS —</option>}
                 {accounts.map((a) => (
                   <option key={a.id} value={a.ref_code || ''}>
-                    {a.name}
+                    {a.display_name || a.name}
                     {a.ref_code ? ` (${a.ref_code})` : ' — belum punya kode link'}
                   </option>
                 ))}
@@ -702,7 +702,7 @@ export const CSLinks: React.FC = () => {
             {refCode ? (
               <>
                 Statistik dihitung dari pendaftaran dengan kode ref <strong>{refCode}</strong>
-                {isAdmin && selectedAccount ? <> milik <strong>{selectedAccount.name}</strong></> : null}.
+                {isAdmin && selectedAccount ? <> milik <strong>{selectedAccount.display_name || selectedAccount.name}</strong></> : null}.
               </>
             ) : (
               <>

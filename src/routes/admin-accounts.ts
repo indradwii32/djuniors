@@ -20,7 +20,9 @@ const adminAccounts = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Hanya admin/super_admin (akun CS diblokir lebih awal oleh gate di index.ts,
 // requireRole di sini sebagai pengaman kedua).
 
-const SAFE_COLS = 'a.id, a.username, a.name, a.role, a.ref_code, a.is_active, a.last_login, a.created_at';
+const SAFE_COLS = `a.id, a.username, a.name, a.role, a.ref_code, a.is_active,
+    a.last_login, a.created_at, a.display_name, a.phone,
+    COALESCE(NULLIF(TRIM(a.display_name), ''), a.name) AS display_name_resolved`;
 
 // Kode ref: CS + 6 karakter acak (tanpa karakter ambigu 0/O/1/I).
 function generateRefCode(): string {
@@ -51,7 +53,9 @@ async function uniqueRefCode(db: D1Database): Promise<string> {
 adminAccounts.get('/me', adminAuthMiddleware, async (c) => {
     const payload = c.get('jwtPayload');
     const me = await c.env.DB.prepare(
-        'SELECT id, username, name, role, ref_code, is_active FROM admin_accounts WHERE id = ?'
+        `SELECT id, username, name, role, ref_code, is_active, phone,
+                COALESCE(NULLIF(TRIM(display_name), ''), name) AS display_name
+         FROM admin_accounts WHERE id = ?`
     ).bind(payload.userId).first();
     if (!me) return c.json({ error: 'Akun tidak ditemukan' }, 404);
     return c.json({ success: true, account: me });
@@ -137,7 +141,8 @@ adminAccounts.put('/:id', adminAuthMiddleware, requireRole('admin', 'super_admin
     const body = await c.req.json();
 
     const account = await c.env.DB.prepare(
-        'SELECT id, username, name, role, ref_code, is_active FROM admin_accounts WHERE id = ?'
+        `SELECT id, username, name, role, ref_code, is_active, phone, display_name
+         FROM admin_accounts WHERE id = ?`
     ).bind(id).first();
     if (!account) return c.json({ error: 'Akun tidak ditemukan' }, 404);
 
@@ -152,6 +157,14 @@ adminAccounts.put('/:id', adminAuthMiddleware, requireRole('admin', 'super_admin
     }
 
     const name = body.name !== undefined ? String(body.name).trim() : account.name;
+    // Nama tampilan = nama profil. Admin boleh mengeditnya untuk CS, sama
+    // seperti CS boleh mengeditnya sendiri lewat PUT /api/auth/profile.
+    const displayName = body.display_name !== undefined
+        ? String(body.display_name).trim().slice(0, 80)
+        : (account.display_name || '');
+    const phone = body.phone !== undefined
+        ? String(body.phone).trim().slice(0, 30)
+        : (account.phone || '');
     const role = body.role !== undefined
         ? (body.role === 'admin' || body.role === 'super_admin' || body.role === 'cs' ? body.role : account.role)
         : account.role;
@@ -163,8 +176,8 @@ adminAccounts.put('/:id', adminAuthMiddleware, requireRole('admin', 'super_admin
     }
 
     await c.env.DB.prepare(
-        'UPDATE admin_accounts SET name = ?, role = ?, is_active = ? WHERE id = ?'
-    ).bind(name, role, isActive, id).run();
+        'UPDATE admin_accounts SET name = ?, display_name = ?, phone = ?, role = ?, is_active = ? WHERE id = ?'
+    ).bind(name, displayName, phone, role, isActive, id).run();
 
     // Reset password opsional
     if (body.password) {

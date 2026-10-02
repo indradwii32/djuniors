@@ -9,7 +9,7 @@
 // ============================================================
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, KeyRound, RefreshCw, Save, Send, UserRound } from 'lucide-react';
+import { AlertCircle, CheckCircle2, KeyRound, RefreshCw, Save, Send } from 'lucide-react';
 import { csWaApi, adminAccountsApi, AdminAccountItem, CsWaSettingsResponse } from '../utils/api';
 
 const inputStyle: React.CSSProperties = {
@@ -38,7 +38,6 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
 
   const [tokenInput, setTokenInput] = useState('');
   const [clearToken, setClearToken] = useState(false);
-  const [displayName, setDisplayName] = useState('');
   const [testPhone, setTestPhone] = useState('');
   const [notice, setNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -51,9 +50,6 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
     setData(res);
     setTokenInput('');
     setClearToken(false);
-    // Nama pengirim: isi kolom dengan nilai yang tersimpan, atau dengan nama
-    // akun supaya kelihatan jelas nama mana yang lagi dipakai.
-    setDisplayName(res.settings.wa_display_name || res.account.name);
   }, []);
 
   // Admin: daftar CS untuk dropdown. CS: langsung load setelan sendiri.
@@ -108,17 +104,11 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
         ref: isAdmin && selectedRef ? selectedRef : undefined,
         fonnte_token: tokenInput.trim() || undefined,
         clear_token: clearToken || undefined,
-        // Kosong = kembali memakai nama akun (bukan nama kosong di pesan).
-        wa_display_name: displayName.trim(),
       });
-      applyData({
-        ...(data as CsWaSettingsResponse),
-        settings: res.settings,
-        wa_display_name: res.wa_display_name,
-      });
+      applyData({ ...(data as CsWaSettingsResponse), settings: res.settings });
       setTokenInput('');
       setClearToken(false);
-      showNotice('Nama pengirim & token tersimpan');
+      showNotice('Token Fonnte tersimpan');
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'Gagal menyimpan', 'error');
     } finally {
@@ -193,9 +183,9 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
             Device WhatsApp milik CS
           </h3>
           <p style={{ color: '#64748B', fontSize: '0.85rem', margin: 0, maxWidth: '58ch' }}>
-            Nama pengirim pesan dan token Fonnte milik CS ini. Nama tampil di tanda tangan setiap pesan; token
-            opsional — kalau diisi, pesan dikirim lewat device tersebut, kalau kosong memakai token global. Isi
-            pesan &amp; saklar aktif diatur di <strong>Editor Template</strong>.
+            Token Fonnte opsional. Kalau diisi, pesan notifikasi dari CS ini dikirim lewat device
+            tersebut; kalau kosong, sistem memakai token global. Isi pesan &amp; saklar aktif diatur di{' '}
+            <strong>Editor Template</strong>. Nama yang tampil di pesan diatur di <strong>Profil Akun</strong>.
           </p>
         </div>
         {isAdmin && (
@@ -221,7 +211,7 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
               {accounts.length === 0 && <option value="">— Belum ada akun CS —</option>}
               {accounts.map((a) => (
                 <option key={a.id} value={a.ref_code || ''}>
-                  {a.name} ({a.ref_code || 'tanpa ref'})
+                  {a.display_name || a.name} ({a.ref_code || 'tanpa ref'})
                 </option>
               ))}
             </select>
@@ -279,48 +269,6 @@ export const WaSettingsCard: React.FC<Props> = ({ isAdmin }) => {
             marginTop: '1.25rem',
           }}
         >
-          <div
-            style={{
-              backgroundColor: '#F8FAFC',
-              border: '1px solid #E2E8F0',
-              borderRadius: '12px',
-              padding: '1rem 1.1rem',
-            }}
-          >
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                color: '#475569',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                marginBottom: '6px',
-              }}
-            >
-              <UserRound size={13} /> Nama Pengirim WhatsApp ({data.account.name})
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder={data.account.name}
-              style={{ ...inputStyle, maxWidth: '380px' }}
-            />
-            <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '6px 0 0 0' }}>
-              Nama yang muncul di tanda tangan setiap pesan WA ({'{cs_name}'}). Kosongkan untuk kembali memakai
-              nama akun <strong>{data.account.name}</strong>. Nama akun sendiri hanya bisa diubah admin di
-              Pengaturan &rarr; Akun Tim.
-            </p>
-            {data.settings.wa_display_name_set && (
-              <p style={{ fontSize: '0.78rem', color: '#6D28D9', margin: '4px 0 0 0', fontWeight: 700 }}>
-                Sedang dipakai: {data.wa_display_name}
-              </p>
-            )}
-          </div>
-
           <div
             style={{
               backgroundColor: '#F8FAFC',

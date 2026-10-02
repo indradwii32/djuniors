@@ -263,7 +263,9 @@ auth.get('/me', authMiddleware, async (c) => {
 
     if (payload.type === 'admin') {
         const admin = await c.env.DB.prepare(
-            'SELECT id, username, name, role, ref_code FROM admin_accounts WHERE id = ?'
+            `SELECT id, username, name, role, ref_code,
+                    COALESCE(NULLIF(TRIM(display_name), ''), name) AS display_name
+             FROM admin_accounts WHERE id = ?`
         ).bind(payload.userId).first();
         return c.json({ type: 'admin', ...admin });
     } else {
@@ -272,6 +274,51 @@ auth.get('/me', authMiddleware, async (c) => {
         ).bind(payload.userId).first();
         return c.json({ type: 'user', ...user });
     }
+});
+
+/**
+ * PUT /api/auth/profile
+ * Simpan profil akun tim (admin & CS): nama yang tampil dan nomor telepon.
+ *
+ * `name` (label internal) TIDAK bisa diubah di sini — hanya admin yang boleh,
+ * lewat Akun Tim, karena username/label dipakai untuk mengenali akun. Yang
+ * bebas diubah setiap akun adalah `display_name`, dan itulah yang tampil di
+ * dashboard, laporan, dan tanda tangan pesan WhatsApp.
+ */
+auth.put('/profile', authMiddleware, async (c) => {
+    const payload = c.get('jwtPayload');
+    if (payload.type !== 'admin') {
+        return c.json({ error: 'Forbidden', message: 'Hanya akun dashboard yang punya profil di sini' }, 403);
+    }
+
+    const body = await c.req.json() as any;
+    const current = await c.env.DB.prepare(
+        'SELECT id, name, display_name, phone FROM admin_accounts WHERE id = ?'
+    ).bind(payload.userId).first<{ id: string; name: string; display_name: string; phone: string | null }>();
+    if (!current) return c.json({ error: 'Akun tidak ditemukan' }, 404);
+
+    const displayName = body.display_name !== undefined
+        ? String(body.display_name).trim().slice(0, 80)
+        : (current.display_name || '');
+    const phone = body.phone !== undefined
+        ? String(body.phone).trim().slice(0, 30)
+        : (current.phone || '');
+
+    await c.env.DB.prepare(
+        'UPDATE admin_accounts SET display_name = ?, phone = ? WHERE id = ?'
+    ).bind(displayName, phone, payload.userId).run();
+
+    const updated = await c.env.DB.prepare(
+        `SELECT id, username, name, phone, role, ref_code,
+                COALESCE(NULLIF(TRIM(display_name), ''), name) AS display_name
+         FROM admin_accounts WHERE id = ?`
+    ).bind(payload.userId).first();
+
+    return c.json({
+        success: true,
+        account: updated,
+        message: 'Profil berhasil disimpan',
+    });
 });
 
 export default auth;

@@ -335,7 +335,7 @@ export const Laporan: React.FC = () => {
                 <option value="">Semua CS (agregat)</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.ref_code || ''}>
-                    {a.name} ({a.ref_code || 'tanpa ref'})
+                    {a.display_name || a.name} ({a.ref_code || 'tanpa ref'})
                   </option>
                 ))}
               </select>

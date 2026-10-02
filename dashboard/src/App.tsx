@@ -33,6 +33,7 @@ const Forms = React.lazy(() => import('./pages/Forms'));
 const Notifications = React.lazy(() => import('./pages/Notifications'));
 const CMS = React.lazy(() => import('./pages/CMS'));
 const Settings = React.lazy(() => import('./pages/Settings'));
+const ProfilAkun = React.lazy(() => import('./pages/ProfilAkun'));
 const VerifikasiPembayaran = React.lazy(() => import('./pages/VerifikasiPembayaran'));
 const CSLinks = React.lazy(() => import('./pages/CSLinks'));
 const Laporan = React.lazy(() => import('./pages/Laporan'));
@@ -99,6 +100,13 @@ export const App: React.FC = () => {
             <Route
               path="settings"
               element={<RoleRoute roles={['admin', 'super_admin']}><Settings /></RoleRoute>}
+            />
+            {/* Profil Akun terbuka untuk semua role dashboard, termasuk CS —
+                nama yang tampil di sini juga dipakai tanda tangan pesan WA,
+                jadi CS harus bisa mengeditnya tanpa akses Pengaturan Sistem. */}
+            <Route
+              path="profil"
+              element={<RoleRoute roles={['admin', 'super_admin', 'cs']}><ProfilAkun /></RoleRoute>}
             />
           </Route>
 

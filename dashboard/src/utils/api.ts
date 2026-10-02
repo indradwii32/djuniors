@@ -27,6 +27,9 @@ export interface AdminUser {
   name: string;
   role: 'super_admin' | 'admin' | 'cs' | string;
   ref_code?: string | null;
+  /** Nama profil yang tampil di seluruh UI; '' = pakai `name`. */
+  display_name?: string;
+  phone?: string;
 }
 
 // Akun tim dashboard (admin & CS) — menu Pengaturan → Akun Tim / Link CS
@@ -39,6 +42,12 @@ export interface AdminAccountItem {
   is_active: boolean | number;
   last_login?: string | null;
   created_at?: string;
+  /** Nama profil yang tampil di seluruh UI; '' = pakai `name`. */
+  display_name?: string;
+  /** Nama hasil resolusi (display_name → name). Dari server. */
+  display_name_resolved?: string;
+  /** Nomor WhatsApp CS. */
+  phone?: string;
   // statistik agregat dari LEFT JOIN registrations ON ref_code
   reg_total?: number;
   reg_paid?: number;
@@ -475,6 +484,18 @@ export const authApi = {
       body: JSON.stringify(data),
     });
   },
+
+  /**
+   * Simpan profil akun dashboard (admin & CS): nama yang tampil dan nomor
+   * WhatsApp. Nama ini dipakai dashboard, laporan, dan tanda tangan pesan WA.
+   */
+  saveProfile: async (data: { display_name?: string; phone?: string }): Promise<{
+    success: boolean;
+    account: { id: string; username: string; name: string; display_name: string; phone: string; role: string; ref_code: string | null };
+    message?: string;
+  }> => {
+    return apiRequest('/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
+  },
 };
 
 // Dashboard Endpoints
@@ -735,7 +756,7 @@ export const adminAccountsApi = {
   },
   update: async (
     id: string,
-    data: { name?: string; role?: string; is_active?: boolean; password?: string }
+    data: { name?: string; display_name?: string; role?: string; is_active?: boolean; password?: string }
   ): Promise<{ success: boolean; account: AdminAccountItem; message?: string }> => {
     return apiRequest(`/admin/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   },
@@ -756,17 +777,12 @@ export const csApi = {
 export interface CsWaSettings {
   fonnte_token_masked: string;
   fonnte_token_set: boolean;
-  /** Nama pengirim untuk {cs_name}; string kosong = memakai nama akun. */
-  wa_display_name: string;
-  wa_display_name_set: boolean;
   is_default: boolean;
   updated_at: string | null;
 }
 export interface CsWaSettingsResponse {
   success: boolean;
-  account: { id: string; name: string; ref_code: string | null };
-  /** Nama final yang dipakai di pesan (sudah memperhitungkan fallback). */
-  wa_display_name: string;
+  account: { id: string; name: string; display_name?: string; ref_code: string | null };
   settings: CsWaSettings;
   placeholders: string[];
   /** Label ramah + contoh isi untuk tiap variable (opsional dari server lama). */
@@ -787,13 +803,7 @@ export const csWaApi = {
     ref?: string;
     fonnte_token?: string;
     clear_token?: boolean;
-    /** Nama pengirim untuk {cs_name}; '' = kembali memakai nama akun. */
-    wa_display_name?: string;
-  }): Promise<{
-    success: boolean;
-    settings: CsWaSettings;
-    wa_display_name: string;
-  }> => {
+  }): Promise<{ success: boolean; settings: CsWaSettings }> => {
     const { ref, ...body } = payload;
     const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
     return apiRequest(`/cs/wa-settings${qs}`, { method: 'PUT', body: JSON.stringify(body) });

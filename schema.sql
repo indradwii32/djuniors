@@ -135,6 +135,10 @@ CREATE TABLE IF NOT EXISTS admin_accounts (
     name TEXT NOT NULL,
     role TEXT DEFAULT 'admin', -- 'super_admin', 'admin', 'cs'
     ref_code TEXT, -- kode unik link CS (?ref=); hanya untuk role 'cs'
+    -- Nama yang tampil di seluruh UI (dashboard, laporan, tanda tangan WA).
+    -- Kosong = pakai `name`. Bisa diisi sendiri oleh pemilik akun.
+    display_name TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
     is_active BOOLEAN DEFAULT 1,
     last_login DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -154,6 +158,7 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
 );
 
 -- Setelan Fonnte + template pesan WhatsApp per-CS
+-- (isi pesan & saklar aktif sudah pindah ke wa_templates; lihat migrasi 007)
 CREATE TABLE IF NOT EXISTS cs_wa_settings (
     admin_account_id TEXT PRIMARY KEY REFERENCES admin_accounts(id) ON DELETE CASCADE,
     fonnte_token     TEXT    NOT NULL DEFAULT '',
@@ -161,9 +166,6 @@ CREATE TABLE IF NOT EXISTS cs_wa_settings (
     tpl_payment      TEXT    NOT NULL DEFAULT '',
     auto_registration INTEGER NOT NULL DEFAULT 1,
     auto_payment      INTEGER NOT NULL DEFAULT 1,
-    -- Nama yang tampil sebagai {cs_name} di pesan WA. Kosong = pakai
-    -- admin_accounts.name (lihat juga migrasi 010).
-    wa_display_name  TEXT    NOT NULL DEFAULT '',
     updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

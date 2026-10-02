@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Menu,
   ExternalLink,
@@ -14,6 +15,7 @@ import {
   AlertCircle,
   X,
   Loader2,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationsApi, authApi, PUBLIC_SITE_URL } from '../utils/api';
@@ -33,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
+  const navigate = useNavigate();
 
   // Change password form state
   const [oldPassword, setOldPassword] = useState('');
@@ -283,7 +286,7 @@ export const Header: React.FC<HeaderProps> = ({
                   fontSize: '0.9rem',
                 }}
               >
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                {(user?.display_name || user?.name || 'A').charAt(0).toUpperCase()}
               </div>
               <div style={{ textAlign: 'left' }} className="hidden-mobile">
                 <div
@@ -294,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({
                     lineHeight: 1.2,
                   }}
                 >
-                  {user?.name || 'Admin'}
+                  {user?.display_name || user?.name || 'Admin'}
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
                   {user?.role?.replace('_', ' ') || 'Super Admin'}
@@ -366,6 +369,39 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <KeyRound size={16} />
                   <span>Ubah Password</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    navigate('/profil');
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#334155',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F8FAFC';
+                    e.currentTarget.style.color = '#4A90D9';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#334155';
+                  }}
+                >
+                  <UserCog size={16} />
+                  <span>Profil Akun</span>
                 </button>
 
                 <div

@@ -23,6 +23,7 @@ import {
   ClipboardCheck,
   Link2,
   BarChart3,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -137,6 +138,13 @@ const csMenuItems: MenuItem[] = [
     label: 'Notifikasi WA',
     path: '/notifications',
     icon: MessageSquare,
+  },
+  // Profil: nama yang tampil di dashboard, laporan, dan tanda tangan pesan WA.
+  // Ada di menu admin maupun CS karena keduanya boleh mengubahnya sendiri.
+  {
+    label: 'Profil Akun',
+    path: '/profil',
+    icon: UserCog,
   },
 ];
 
@@ -587,7 +595,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   flexShrink: 0,
                 }}
               >
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                {(user?.display_name || user?.name || 'A').charAt(0).toUpperCase()}
               </div>
               <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
                 <div
@@ -599,9 +607,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                   }}
-                  title={user?.name || 'Administrator'}
+                  title={user?.display_name || user?.name || 'Administrator'}
                 >
-                  {user?.name || 'Administrator'}
+                  {user?.display_name || user?.name || 'Administrator'}
                 </div>
                 <div
                   style={{
