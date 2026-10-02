@@ -190,13 +190,25 @@ auth.post('/admin/login', adminLoginLimiter, async (c) => {
         expirationTtl: 24 * 60 * 60
     });
 
+    // Resolusi nama di sisi server: kolom display_name bisa berisi string
+    // kosong (artinya "pakai nama akun"), jadi harus di-fallback dengan ||,
+    // bukan ?? — ?? hanya menutupi null/undefined.
+    const adminName = (admin.name as string) || '';
+    const rawDisplay = ((admin.display_name as string) || '').trim();
+
     return c.json({
         success: true,
         token,
+        // display_name = nama hasil resolusi (display_name → name). Tanpa
+        // ini frontend harus menunggu /auth/me dulu; yang dipanggil
+        // setStoredAdminUser di sisi klien, jadi kolom profil akan kosong
+        // pada render pertama.
         admin: {
             id: admin.id,
             username: admin.username,
             name: admin.name,
+            display_name: rawDisplay || adminName,
+            phone: (admin.phone as string) ?? '',
             role: admin.role,
             ref_code: admin.ref_code ?? null
         }
@@ -263,7 +275,7 @@ auth.get('/me', authMiddleware, async (c) => {
 
     if (payload.type === 'admin') {
         const admin = await c.env.DB.prepare(
-            `SELECT id, username, name, role, ref_code,
+            `SELECT id, username, name, role, ref_code, phone,
                     COALESCE(NULLIF(TRIM(display_name), ''), name) AS display_name
              FROM admin_accounts WHERE id = ?`
         ).bind(payload.userId).first();
@@ -308,9 +320,12 @@ auth.put('/profile', authMiddleware, async (c) => {
         'UPDATE admin_accounts SET display_name = ?, phone = ? WHERE id = ?'
     ).bind(displayName, phone, payload.userId).run();
 
+    // PENTING: yang dikembalikan adalah display_name MENTAH, bukan hasil
+    // resolusi ke `name`. Kalau yang dikirim hasil resolusi, frontend yang
+    // menyalin nilai ini ke form akan melihat kolom terisi lagi begitu user
+    // mengosongkannya — jadi "pakai nama akun" tidak akan pernah bisa dipakai.
     const updated = await c.env.DB.prepare(
-        `SELECT id, username, name, phone, role, ref_code,
-                COALESCE(NULLIF(TRIM(display_name), ''), name) AS display_name
+        `SELECT id, username, name, phone, role, ref_code, display_name
          FROM admin_accounts WHERE id = ?`
     ).bind(payload.userId).first();
 

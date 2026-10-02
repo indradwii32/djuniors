@@ -59,13 +59,23 @@ const ProfilAkun: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const effectiveName = (user?.display_name || '').trim() || user?.name || '';
+  const shownName = displayName.trim() || user?.name || '';
 
+  // Isi form dari context, TAPI hanya saat akun berganti atau belum pernah
+  // diisi. Setelah simpan, form yang otoritatif adalah form ini sendiri.
+  //
+  // Kenapa: /auth/me mengembalikan display_name yang sudah di-resolve ke `name`
+  // kalau kolomnya kosong. Kalau form di-set ulang dari situ setiap context
+  // berubah, mengosongkan kolom akan langsung terisi `Administrator` lagi —
+  // user menekan Simpan, tidak ada error, tapi namanya kembali sendiri.
+  const [hydratedFor, setHydratedFor] = useState<string>('');
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
+    if (hydratedFor === user.id) return;
     setDisplayName((user.display_name || '').trim() || user.name || '');
     setPhone(user.phone || '');
-  }, [user?.id, user?.display_name, user?.name, user?.phone]);
+    setHydratedFor(user.id);
+  }, [user?.id, user?.display_name, user?.name, user?.phone, hydratedFor]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,9 +85,21 @@ const ProfilAkun: React.FC = () => {
         display_name: displayName.trim(),
         phone: phone.trim(),
       });
-      // Profil disimpan di server; segarkan context supaya Header, dropdown,
-      // dan seluruh halaman langsung ikut nama baru.
-      await refreshUser();
+      // Samakan form dengan nilai yang benar-benar tersimpan di server, bukan
+      // dengan apa yang diketik: kolom kosong berarti "pakai nama akun", jadi
+      // kolom harus ikut kosong, bukan diisi nama akun.
+      const saved = res.account;
+      if (saved) {
+        setDisplayName((saved.display_name || '').trim());
+        setPhone(saved.phone || '');
+      }
+      // Segarkan context supaya Header, sidebar, dan halaman lain ikut nama
+      // baru. Kegagalan di sini tidak menggagalkan simpan profil.
+      try {
+        await refreshUser();
+      } catch {
+        /* ignore */
+      }
       setNotice({ text: res.message || 'Profil berhasil disimpan', type: 'success' });
       setTimeout(() => setNotice(null), 4000);
     } catch (err) {
@@ -115,7 +137,7 @@ const ProfilAkun: React.FC = () => {
               flexShrink: 0,
             }}
           >
-            {effectiveName ? effectiveName.charAt(0).toUpperCase() : 'A'}
+            {shownName ? shownName.charAt(0).toUpperCase() : 'A'}
           </div>
           <div style={{ minWidth: 0 }}>
             <h2
@@ -127,7 +149,7 @@ const ProfilAkun: React.FC = () => {
                 overflowWrap: 'anywhere',
               }}
             >
-              {effectiveName || 'Akun Dashboard'}
+              {shownName || 'Akun Dashboard'}
             </h2>
             <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '2px' }}>
               @{user?.username || '—'}

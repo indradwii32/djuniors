@@ -468,11 +468,16 @@ export const authApi = {
 
   getMe: async (): Promise<AdminUser> => {
     const res = await apiRequest<AdminUser & { type: string }>('/auth/me');
+    // WAJIB menyimpan display_name & phone. Kalau dibuang di sini, konteks
+    // balik ke `name` setiap kali profil dimuat ulang — kolom nama di form
+    // Profil Akun jadi kosong dan perubahan terlihat tidak tersimpan.
     const admin: AdminUser = {
       id: res.id,
       username: res.username,
       name: res.name,
       role: res.role,
+      display_name: res.display_name ?? '',
+      phone: res.phone ?? '',
     };
     setStoredAdminUser(admin);
     return admin;
