@@ -241,6 +241,11 @@ export interface NotificationItem {
   title?: string;
   message?: string;
   status: 'pending' | 'sent' | 'failed';
+  /**
+   * Alasan kegagalan (atau id pesan Fonnte saat berhasil) dari server.
+   * Kolom ini ada sejak migrasi 013.
+   */
+  error_detail?: string | null;
   sent_at?: string;
   created_at: string;
 }

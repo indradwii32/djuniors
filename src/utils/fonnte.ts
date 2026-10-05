@@ -8,6 +8,7 @@
 import { D1Database } from '@cloudflare/workers-types';
 
 const FONNTE_TOKEN_KEY = 'fonnte_token';
+const FONNTE_BASE_KEY = 'fonnte_base_url';
 
 export async function getFonnteToken(env: { DB: D1Database; WA_FONNTE_TOKEN?: string }): Promise<string> {
     // 1. Try D1 settings table first (dashboard-editable)
@@ -31,6 +32,27 @@ export async function getFonnteToken(env: { DB: D1Database; WA_FONNTE_TOKEN?: st
     return '';
 }
 
+/**
+ * Base URL endpoint Fonnte.
+ *
+ * Disimpan di settings (`fonnte_base_url`) supaya bisa diarahkan ke proxy/mock
+ * lokal saat diagnosa, tanpa harus deploy ulang. Tidak diset = default resmi
+ * Fonnte. Baca gagal = tetap default, jadi perubahan ini tidak pernah bisa
+ * membuat pengiriman mati.
+ */
+export async function getFonnteBaseUrl(env: { DB: D1Database }): Promise<string> {
+    try {
+        const row = await env.DB.prepare(
+            `SELECT value FROM settings WHERE key = ?`
+        ).bind(FONNTE_BASE_KEY).first<{ value: string }>();
+        const v = (row?.value || '').trim().replace(/\/+$/, '');
+        if (v) return v;
+    } catch {
+        // abaikan
+    }
+    return 'https://api.fonnte.com';
+}
+
 export interface FonnteConfig {
     token: string;
     baseUrl?: string;
@@ -43,8 +65,36 @@ export interface FonnteResponse {
 }
 
 /**
- * Send WhatsApp message via Fonnte API
- * Docs: https://fonnte.com/api
+ * Normalisasi nomor tujuan ke format Fonnte (digits saja, tanpa 0 depan).
+ *
+ * "0812..." -> "62812...", "62812-3456-789" -> "628123456789", dan "8..."
+ * juga diubah jadi "628..." karena lazim dipakai orang Indonesia.
+ */
+function normalizeTarget(phone: string): string {
+    let digits = String(phone || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) {
+        digits = '62' + digits.slice(1);
+    } else if (digits.startsWith('8')) {
+        digits = '62' + digits;
+    }
+    return digits;
+}
+
+/**
+ * Kirim pesan WhatsApp via Fonnte API.
+ *
+ * PENTING — format body: Fonnte TIDAK menerima application/json pada
+ * `/send`. Dengan JSON, Fonnte membalas
+ *   {"status":false,"reason":"invalid/empty body value"}
+ * sementara HTTP-nya tetap 200 — jadi kegagalan tidak kelihatan sebagai
+ * error, dan device tetap dilaporkan "connect" oleh `/device` (yang memang
+ * menerima JSON). Itulah sebabnya dashboard bisa menampilkan Fonnte online
+ * sementara setiap pesan gagal terkirim.
+ *
+ * Fonnte hanya menerima `application/x-www-form-urlencoded` atau
+ * `multipart/form-data` pada `/send`. Yang dipakai di sini: form-urlencoded.
+ *
+ * Docs: https://docs.fonnte.com
  */
 export async function sendWAFonnte(
     config: FonnteConfig,
@@ -54,47 +104,78 @@ export async function sendWAFonnte(
 ): Promise<FonnteResponse> {
     const baseUrl = config.baseUrl || 'https://api.fonnte.com';
 
-    // Format phone number (remove + or spaces, ensure starts with country code)
-    let formattedPhone = phone.replace(/[^0-9]/g, '');
-    if (formattedPhone.startsWith('0')) {
-        formattedPhone = '62' + formattedPhone.substring(1);
+    const target = normalizeTarget(phone);
+
+    // Token kosong: jangan kirim request sama sekali. Tanpa cek ini,
+    // Fonnte membalas error generik dan sulit dibedakan dari token salah.
+    if (!config.token || config.token.trim() === '') {
+        return { status: false, message: 'Token Fonnte kosong' };
+    }
+    if (!target) {
+        return { status: false, message: 'Nomor tujuan tidak valid' };
+    }
+    if (!message || !message.trim()) {
+        return { status: false, message: 'Pesan kosong' };
+    }
+
+    // Batas Fonnte: 4096 karakter per pesan. Melewati batas → Fonnte menolak
+    // seluruh request, bukan memotong.
+    if (message.length > 4096) {
+        return { status: false, message: `Pesan terlalu panjang (${message.length}/4096 karakter)` };
     }
 
     try {
+        const body = new URLSearchParams();
+        body.set('target', target);
+        body.set('message', message);
+        body.set('typing', String(options?.typing ?? true));
+        body.set('delay', String(options?.delay ?? 0));
+
         const response = await fetch(`${baseUrl}/send`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'Authorization': config.token
             },
-            body: JSON.stringify({
-                target: formattedPhone,
-                message: message,
-                typing: options?.typing ?? true,
-                delay: options?.delay ?? 0
-            }),
+            body: body.toString(),
             // Jangan pernah menahan response request lain bila Fonnte lambat/matikan
-            signal: AbortSignal.timeout(10_000)
+            signal: AbortSignal.timeout(20_000)
         });
 
-        const data = await response.json() as any;
+        const text = await response.text();
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            // Fonnte kadang balas HTML/teks bila gateway-nya bermasalah.
+            return {
+                status: false,
+                message: `Respons Fonnte tidak valid: ${text.slice(0, 120)}`
+            };
+        }
+
+        if (data.status !== true) {
+            // Fonnte menyertakan `reason` untuk body salah / device masalah.
+            const reason = data.reason || data.detail || data.message || 'ditolak Fonnte';
+            return { status: false, message: String(reason) };
+        }
 
         return {
-            status: data.status || false,
-            message: data.message,
-            id: data.id
+            status: true,
+            message: data.detail || data.message || 'terkirim',
+            id: Array.isArray(data.id) ? String(data.id[0]) : (data.id ? String(data.id) : undefined)
         };
     } catch (error) {
         console.error('Fonnte API error:', error);
         return {
             status: false,
-            message: 'Failed to send message'
+            message: error instanceof Error ? error.message : 'Gagal menghubungi Fonnte'
         };
     }
 }
 
 /**
- * Send bulk WhatsApp messages via Fonnte
+ * Kirim banyak pesan sekaligus (satu device, banyak target).
  */
 export async function sendBulkWAFonnte(
     config: FonnteConfig,
@@ -102,42 +183,60 @@ export async function sendBulkWAFonnte(
 ): Promise<FonnteResponse> {
     const baseUrl = config.baseUrl || 'https://api.fonnte.com';
 
-    const formattedTargets = targets.map(t => {
-        let formattedPhone = t.phone.replace(/[^0-9]/g, '');
-        if (formattedPhone.startsWith('0')) {
-            formattedPhone = '62' + formattedPhone.substring(1);
-        }
-        return {
-            target: formattedPhone,
-            message: t.message
-        };
-    });
+    if (!config.token || config.token.trim() === '') {
+        return { status: false, message: 'Token Fonnte kosong' };
+    }
+
+    const prepared = targets
+        .filter((t) => t && t.message && t.message.trim())
+        .map((t) => ({ target: normalizeTarget(t.phone), message: t.message }));
+
+    if (prepared.length === 0) {
+        return { status: false, message: 'Tidak ada target yang valid' };
+    }
 
     try {
+        // /sendBulk juga menolak JSON — harus form-urlencoded.
+        const body = new URLSearchParams();
+        // targets[][] adalah nama field yang diharapkan Fonnte untuk array.
+        prepared.forEach((t) => {
+            body.append('targets[][]', `${t.target}|${t.message}`);
+        });
+        body.set('typing', 'true');
+        body.set('delay', '1000');
+
         const response = await fetch(`${baseUrl}/sendBulk`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'Authorization': config.token
             },
-            body: JSON.stringify({
-                targets: formattedTargets,
-                typing: true,
-                delay: 1000 // 1 second delay between messages
-            })
+            body: body.toString(),
+            signal: AbortSignal.timeout(30_000)
         });
 
-        const data = await response.json() as any;
+        const text = await response.text();
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            return {
+                status: false,
+                message: `Respons Fonnte tidak valid: ${text.slice(0, 120)}`
+            };
+        }
 
-        return {
-            status: data.status || false,
-            message: data.message
-        };
+        if (data.status !== true) {
+            const reason = data.reason || data.detail || data.message || 'ditolak Fonnte';
+            return { status: false, message: String(reason) };
+        }
+
+        return { status: true, message: data.detail || data.message || 'terkirim' };
     } catch (error) {
         console.error('Fonnte bulk API error:', error);
         return {
             status: false,
-            message: 'Failed to send bulk messages'
+            message: error instanceof Error ? error.message : 'Gagal menghubungi Fonnte'
         };
     }
 }
@@ -217,15 +316,19 @@ export async function sendWaWithFallback(
     const primary = (primaryToken || '').trim();
     const fallback = (fallbackToken || '').trim();
 
+    // Base URL dibaca sekali, lalu dipakai untuk kedua percobaan — supaya
+    // kegagalan membaca settings tidak mengubah tujuan kiriman di tengah jalan.
+    const baseUrl = await getFonnteBaseUrl(env);
+
     if (primary) {
-        const result = await sendWAFonnte({ token: primary }, phone, message, options);
+        const result = await sendWAFonnte({ token: primary, baseUrl }, phone, message, options);
         if (result.status) {
             return { ...result, source: 'primary' };
         }
         // Token utama gagal → coba cadangan, kecuali keduanya token sama
         // (percobaan kedua sia-sia dan hanya membuang kuota).
         if (fallback && fallback !== primary) {
-            const retry = await sendWAFonnte({ token: fallback }, phone, message, options);
+            const retry = await sendWAFonnte({ token: fallback, baseUrl }, phone, message, options);
             if (retry.status) {
                 return { ...retry, source: 'fallback', primary_error: result.message || 'gagal' };
             }
@@ -241,7 +344,7 @@ export async function sendWaWithFallback(
 
     // Tidak ada token utama → langsung pakai cadangan.
     if (fallback) {
-        const result = await sendWAFonnte({ token: fallback }, phone, message, options);
+        const result = await sendWAFonnte({ token: fallback, baseUrl }, phone, message, options);
         return { ...result, source: result.status ? 'fallback' : 'none' };
     }
 

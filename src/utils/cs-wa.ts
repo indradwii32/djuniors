@@ -252,15 +252,23 @@ async function logWa(
     type: string,
     title: string,
     message: string,
-    status: 'sent' | 'failed'
+    status: 'sent' | 'failed',
+    detail?: string
 ): Promise<void> {
-    await db
-        .prepare(
-            `INSERT INTO notifications (id, user_id, type, channel, title, message, status)
-             VALUES (?, NULL, ?, 'wa', ?, ?, ?)`
-        )
-        .bind(crypto.randomUUID(), type, title, message, status)
-        .run();
+    try {
+        await db
+            .prepare(
+                `INSERT INTO notifications (id, user_id, type, channel, title, message, status, error_detail)
+                 VALUES (?, NULL, ?, 'wa', ?, ?, ?, ?)`
+            )
+            .bind(crypto.randomUUID(), type, title, message, status, detail || null)
+            .run();
+    } catch (err) {
+        // Gagal menulis log tidak boleh mengubah hasil pengiriman. Bila
+        // migrasi 013 belum jalan, INSERT tetap melempar — pesan sudah
+        // terkirim, jangan dikabarkan sebagai gagal.
+        console.error('[cs-wa] gagal menulis log notifikasi:', err);
+    }
 }
 
 /**
@@ -367,7 +375,13 @@ export async function sendCsWaAuto(
             `cs_${event}`,
             `${EVENT_LABEL[event]} → ${registration.registration_number}`,
             message,
-            result.status ? 'sent' : 'failed'
+            result.status ? 'sent' : 'failed',
+            // Alasan + token mana yang dipakai. Tanpa ini semua kegagalan
+            // terlihat sama dan tidak bisa dibedakan antara nomor salah,
+            // kuota habis, atau token ditolak.
+            result.status
+                ? `via ${result.source}: ${result.message || 'ok'}`
+                : `${result.source}: ${result.message || 'gagal'}`
         );
 
         return {

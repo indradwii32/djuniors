@@ -84,12 +84,19 @@ async function logWaManual(
     type: string,
     title: string,
     message: string,
-    ok: boolean
+    ok: boolean,
+    detail?: string
 ): Promise<void> {
-    await db.prepare(
-        `INSERT INTO notifications (id, user_id, type, channel, title, message, status)
-         VALUES (?, NULL, ?, 'wa', ?, ?, ?)`
-    ).bind(crypto.randomUUID(), type, title, message, ok ? 'sent' : 'failed').run();
+    try {
+        await db.prepare(
+            `INSERT INTO notifications (id, user_id, type, channel, title, message, status, error_detail)
+             VALUES (?, NULL, ?, 'wa', ?, ?, ?, ?)`
+        ).bind(crypto.randomUUID(), type, title, message, ok ? 'sent' : 'failed', detail || null).run();
+    } catch (err) {
+        // Log gagal tidak boleh dianggap sebagai pengiriman gagal — pesan
+        // mungkin sudah masuk antrian Fonnte.
+        console.error('[cs] gagal menulis log notifikasi:', err);
+    }
 }
 
 cs.get('/overview', adminAuthMiddleware, async (c) => {
@@ -343,7 +350,8 @@ cs.post('/wa-send', adminAuthMiddleware, async (c) => {
         'cs_manual',
         `Manual → ${reg.registration_number}`,
         message,
-        result.status
+        result.status,
+        `${result.source}: ${result.message || (result.status ? 'ok' : 'gagal')}`
     );
 
     const viaFallback = result.source === 'fallback';
@@ -391,7 +399,14 @@ cs.post('/wa-test', adminAuthMiddleware, async (c) => {
         message,
         { typing: false, delay: 0 }
     );
-    await logWaManual(c.env.DB, 'cs_test', `Tes → ${account.ref_code || account.id}`, message, result.status);
+    await logWaManual(
+        c.env.DB,
+        'cs_test',
+        `Tes → ${account.ref_code || account.id}`,
+        message,
+        result.status,
+        `${result.source}: ${result.message || (result.status ? 'ok' : 'gagal')}`
+    );
 
     const viaFallback = result.source === 'fallback';
     // source hanya bermakna saat berhasil. Saat semua token gagal, tandai

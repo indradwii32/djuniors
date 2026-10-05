@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
-import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, getFonnteToken } from '../utils/fonnte';
+import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, getFonnteToken, getFonnteBaseUrl } from '../utils/fonnte';
 import {
     getDueReminderConfig,
     saveDueReminderConfig,
@@ -687,7 +687,7 @@ notifications.post('/wa', async (c) => {
 
     // Send via Fonnte
     const result = await sendWAFonnte(
-        { token: await getFonnteToken(c.env) },
+        { token: await getFonnteToken(c.env), baseUrl: await getFonnteBaseUrl(c.env) },
         phone,
         message,
         { typing: true, delay: 1000 }
@@ -695,15 +695,16 @@ notifications.post('/wa', async (c) => {
 
     // Log notification
     await c.env.DB.prepare(`
-        INSERT INTO notifications (id, user_id, type, channel, title, message, status)
-        VALUES (?, ?, ?, 'wa', ?, ?, ?)
+        INSERT INTO notifications (id, user_id, type, channel, title, message, status, error_detail)
+        VALUES (?, ?, ?, 'wa', ?, ?, ?, ?)
     `).bind(
         crypto.randomUUID(),
         payloadData.userId || null,
         template,
         template,
         message,
-        result.status ? 'sent' : 'failed'
+        result.status ? 'sent' : 'failed',
+        result.status ? (result.message || null) : (result.message || 'gagal')
     ).run();
 
     return c.json({
@@ -754,7 +755,7 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
         );
 
         const result = await sendWAFonnte(
-            { token: await getFonnteToken(c.env) },
+            { token: await getFonnteToken(c.env), baseUrl: await getFonnteBaseUrl(c.env) },
             user.phone as string,
             waMessage,
             { typing: true, delay: 1000 }
@@ -765,14 +766,15 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
 
         // Log
         await c.env.DB.prepare(`
-            INSERT INTO notifications (id, user_id, type, channel, title, message, status)
-            VALUES (?, ?, 'promo', 'wa', ?, ?, ?)
+            INSERT INTO notifications (id, user_id, type, channel, title, message, status, error_detail)
+            VALUES (?, ?, 'promo', 'wa', ?, ?, ?, ?)
         `).bind(
             crypto.randomUUID(),
             user.id,
             `Promo: ${promo.code}`,
             waMessage,
-            result.status ? 'sent' : 'failed'
+            result.status ? 'sent' : 'failed',
+            result.status ? (result.message || null) : (result.message || 'gagal')
         ).run();
     }
 
@@ -802,7 +804,7 @@ notifications.get('/wa/status', async (c) => {
     }
 
     try {
-        const response = await fetch('https://api.fonnte.com/device', {
+        const response = await fetch(`${await getFonnteBaseUrl(c.env)}/device`, {
             method: 'POST',
             headers: {
                 'Authorization': token,

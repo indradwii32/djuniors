@@ -2969,6 +2969,28 @@ export const Notifications: React.FC = () => {
                             <span>Gagal</span>
                           </span>
                         )}
+                        {/* Alasan dari Fonnte. Sebelumnya kolom ini kosong, jadi
+                            semua kegagalan terlihat sama dan tidak bisa
+                            dibedakan antara nomor salah, kuota habis, atau token
+                            ditolak. */}
+                        {notif.error_detail && (
+                          <div
+                            title={notif.error_detail}
+                            style={{
+                              marginTop: '5px',
+                              fontSize: '0.7rem',
+                              lineHeight: 1.35,
+                              color: isFailed ? '#B91C1C' : '#64748B',
+                              fontWeight: isFailed ? 700 : 400,
+                              maxWidth: '260px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {notif.error_detail}
+                          </div>
+                        )}
                       </td>
 
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
@@ -3187,6 +3209,27 @@ export const Notifications: React.FC = () => {
             >
               {detailModalItem.message}
             </div>
+
+            {detailModalItem.error_detail && (
+              <div
+                style={{
+                  backgroundColor: detailModalItem.status === 'failed' ? '#FEF2F2' : '#ECFDF5',
+                  border: `1px solid ${detailModalItem.status === 'failed' ? '#FECACA' : '#A7F3D0'}`,
+                  borderRadius: '12px',
+                  padding: '0.85rem 1rem',
+                  marginBottom: '1.25rem',
+                  fontSize: '0.8rem',
+                  color: detailModalItem.status === 'failed' ? '#B91C1C' : '#047857',
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.5,
+                }}
+              >
+                <strong style={{ display: 'block', marginBottom: '4px' }}>
+                  {detailModalItem.status === 'failed' ? 'Alasan kegagalan' : 'Catatan pengiriman'}
+                </strong>
+                {detailModalItem.error_detail}
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button

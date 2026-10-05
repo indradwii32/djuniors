@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     title TEXT,
     message TEXT,
     status TEXT DEFAULT 'pending',
+    -- Alasan kegagalan dari Fonnte (lihat migrasi 013).
+    error_detail TEXT,
     sent_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
