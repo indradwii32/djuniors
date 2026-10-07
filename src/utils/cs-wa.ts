@@ -17,6 +17,7 @@
 import { D1Database } from '@cloudflare/workers-types';
 import { sendWaWithFallback, getFonnteToken } from './fonnte';
 import { formatWATemplate } from '../routes/notifications';
+import { getPublicSiteUrl } from './public-url';
 
 /**
  * Event notifikasi otomatis + template yang dipakai. Satu event = satu baris
@@ -356,7 +357,10 @@ export async function sendCsWaAuto(
             // jadi fallback-nya hanya "Tim" — bukan "Tim D'Juniors" yang akan
             // menghasilkan tanda tangan ganda.
             opts?.csName || account?.wa_name || 'Tim',
-            opts?.baseUrl || env.BASE_URL,
+            // Pengaman terakhir: pemanggil boleh lupa, tapi link yang dikirim
+            // ke pelanggan tidak boleh menunjuk domain API. getPublicSiteUrl
+            // menolak origin api.* dan workers.dev.
+            opts?.baseUrl || getPublicSiteUrl(env),
             opts?.vars
         );
         if (!message.trim()) return { status: 'skipped', detail: 'pesan_kosong' };

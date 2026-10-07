@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware } from '../middleware/auth';
 import { sendWAFonnte, sendBulkWAFonnte, FonnteTemplates, getFonnteToken, getFonnteBaseUrl } from '../utils/fonnte';
+import { publicSiteUrl } from '../utils/public-url';
 import {
     getDueReminderConfig,
     saveDueReminderConfig,
@@ -287,10 +288,17 @@ export function formatWATemplate(
         ''
     );
     if (!paymentLink && regNumber) {
+        // `base` di sini sudah alamat situs publik (lihat publicSiteUrl).
+        // Pengaman tambahan: kalau ternyata kosong atau justru domain API,
+        // JANGAN hasilkan link relatif — link relatif di WhatsApp tidak ada
+        // artinya bagi pelanggan dan lebih buruk daripada tidak ada link.
         const base = (opts?.baseUrl || data.baseUrl || '').replace(/\/+$/, '');
-        paymentLink = base
-            ? `${base}/lacak.html?number=${encodeURIComponent(regNumber)}`
-            : `/lacak.html?number=${encodeURIComponent(regNumber)}`;
+        const apiLike = /workers\.dev|:\/\/api\.|\.api\./i.test(base);
+        if (base && !apiLike) {
+            paymentLink = `${base}/lacak.html?number=${encodeURIComponent(regNumber)}`;
+        } else if (base && apiLike) {
+            console.warn(`[wa-template] baseUrl terlihat seperti domain API, link lacak dilewati: ${base}`);
+        }
     }
 
     // Date
@@ -616,7 +624,7 @@ notifications.post('/wa', async (c) => {
     let message = '';
 
     const origin = new URL(c.req.url).origin;
-    const baseUrl = (c.env as any).BASE_URL || origin;
+    const baseUrl = publicSiteUrl(c);
 
     // 1. Try to fetch template from DB if template is not 'custom'
     if (template !== 'custom') {
@@ -743,7 +751,7 @@ notifications.post('/wa/bulk-promo', adminAuthMiddleware, async (c) => {
             : `Rp ${(promo.discount_value as number).toLocaleString('id-ID')}`;
 
         const origin = new URL(c.req.url).origin;
-        const baseUrl = (c.env as any).BASE_URL || origin;
+        const baseUrl = publicSiteUrl(c);
 
         const waMessage = message || (dbPromoTmpl?.content
             ? formatWATemplate(dbPromoTmpl.content, {

@@ -13,6 +13,7 @@ import { bumpCacheVersion } from '../middleware/cache';
 import { saveProofToR2 } from '../utils/payment';
 import { getPayableAmount } from '../utils/payment-code';
 import { sendCsWaAuto } from '../utils/cs-wa';
+import { publicSiteUrl } from '../utils/public-url';
 
 const paymentTracking = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -262,7 +263,7 @@ paymentTracking.post('/', async (c) => {
     // dimatikan di sana, pengiriman dilewati. Gagal kirim tidak pernah
     // memblokir unggah bukti — pendaftar tetap melihat respons sukses di bawah.
     const waNotification = await sendCsWaAuto(c.env, registration, 'payment_received', {
-        baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin,
+        baseUrl: publicSiteUrl(c),
     });
 
     return c.json({
@@ -390,7 +391,7 @@ paymentTracking.put('/:id/confirm', adminAuthMiddleware, async (c) => {
             .bind(registration.id).first();
         if (full) {
             waNotification = await sendCsWaAuto(c.env, full, 'payment', {
-                baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin,
+                baseUrl: publicSiteUrl(c),
             });
         }
     }

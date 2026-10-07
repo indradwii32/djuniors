@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import { Bindings, Variables } from '../types';
 import { adminAuthMiddleware, getStaffRefCode, isCSRole } from '../middleware/auth';
 import { getFonnteToken, sendWaWithFallback } from '../utils/fonnte';
+import { publicSiteUrl } from '../utils/public-url';
 import {
     getCsWaSettings,
     saveCsWaSettings,
@@ -275,7 +276,8 @@ cs.get('/wa-preview', adminAuthMiddleware, async (c) => {
 
     const { content: tpl, isEnabled } = await loadEventTemplateForEvent(c.env.DB, event);
 
-    const baseUrl = (c.env as any).BASE_URL || new URL(c.req.url).origin;
+    // Preview harus memakai alamat yang sama dengan pesan sungguhan.
+    const baseUrl = publicSiteUrl(c);
     const message = renderCsWaMessage(
         tpl,
         reg,

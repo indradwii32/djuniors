@@ -16,6 +16,7 @@
 
 import { D1Database } from '@cloudflare/workers-types';
 import { sendCsWaAuto } from './cs-wa';
+import { getPublicSiteUrl } from './public-url';
 
 const CFG_KEY = 'wa_due_reminder_config';
 
@@ -198,7 +199,9 @@ export async function runDueReminders(
             if (!full) continue;
 
             const res = await sendCsWaAuto(env, full as Record<string, unknown>, 'due_reminder', {
-                baseUrl: env.BASE_URL,
+                // Cron tidak punya request, jadi alamat publik diambil dari
+                // konfigurasi — bukan origin Worker (itu domain API).
+                baseUrl: getPublicSiteUrl(env),
                 // {sisa_hari} hanya di template pengingat; placeholder ini
                 // tidak muncul di template lain, jadi tidak mengganggu.
                 vars: {

@@ -70,6 +70,14 @@ WA_FONNTE_TOKEN = ""
 JWT_SECRET = ""
 TURNSTILE_SECRET = ""           # legacy — use secret instead
 TURNSTILE_SITE_KEY = ""         # site-visible key, safe in vars
+# BASE_URL — alamat SITUS PUBLIK, dipakai menyusun link di pesan WhatsApp
+# ({link_pembayaran}) dan email. TIDAK BOLEH diisi domain API: pelanggan tidak
+# bisa membuka api.djuniorslc.com, halaman lacak & upload bukti ada di situs
+# publik. Kalau kosong, kode memakai PUBLIC_SITE_URL sebagai cadangan.
+BASE_URL = "https://djuniorslc.com"
+# Situs publik untuk tautan yang dikirim ke pelanggan. Dipakai sebagai
+# pengaman kedua bila BASE_URL kosong atau salah diisi domain api.
+PUBLIC_SITE_URL = "https://djuniorslc.com"
 # CORS allowlist. Uncomment in production and list every public origin:
 #   ALLOWED_ORIGINS = "https://djuniorslc.com,https://www.djuniorslc.com,https://admin.djuniorslc.com"
 
@@ -88,7 +96,7 @@ TURNSTILE_SITE_KEY = ""         # site-visible key, safe in vars
 # `wrangler dev` always uses local .dev.vars + miniflare (no env-specific vars).
 
 [env.production]
-vars = { ENVIRONMENT = "production", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "" }
+vars = { ENVIRONMENT = "production", WA_FONNTE_TOKEN = "", JWT_SECRET = "", TURNSTILE_SECRET = "", TURNSTILE_SITE_KEY = "", BASE_URL = "https://djuniorslc.com", PUBLIC_SITE_URL = "https://djuniorslc.com" }
 
 # Custom domain for API
 workers_dev = true

@@ -11,6 +11,7 @@ import { pickUniqueCode, getPayableAmount } from '../utils/payment-code';
 import { sendCsWaAuto } from '../utils/cs-wa';
 import { nextRotatorRef } from '../utils/cs-rotator';
 import { rateLimit } from '../utils/rate-limit';
+import { publicSiteUrl } from '../utils/public-url';
 
 const registrations = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // Public tracking reads are cached for 60s — long enough to absorb repeated
@@ -352,7 +353,9 @@ registrations.post('/', registerLimiter, async (c) => {
             created_at: new Date().toISOString(),
         },
         'registration',
-        { baseUrl: (c.env as any).BASE_URL || new URL(c.req.url).origin }
+        // baseUrl WAJIB situs publik: link lacak/upload bukti di pesan ini
+        // dibuka pelanggan, bukan domain API.
+        { baseUrl: publicSiteUrl(c) }
     );
 
     // Info pembayaran lengkap untuk popup sukses & halaman lacak: hanya berisi
